@@ -89,9 +89,17 @@ class Game:
         for table_id in tables_to_use:
             self.tables.append(Table(table_id))
     
-    def add_player(self, name: str, initial_lives: int):
+    def is_name_duplicate(self, name: str) -> bool:
+        """检查姓名是否已存在"""
+        return any(player.name == name for player in self.players)
+    
+    def add_player(self, name: str, initial_lives: int) -> bool:
+        """添加选手，如果姓名重复则返回False"""
+        if self.is_name_duplicate(name):
+            return False
         player = Player(name, initial_lives)
         self.players.append(player)
+        return True
     
     def remove_player(self, index: int):
         """删除指定索引的选手"""
