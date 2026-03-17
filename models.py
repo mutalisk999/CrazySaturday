@@ -227,6 +227,126 @@ class Game:
             new_waiting.position = f"{table.table_id}号台候补"
             new_waiting.table_id = table.table_id
     
+    def eliminate_player(self, player, table_id):
+        """淘汰选手 - HP减1后根据剩余HP移动到相应区域，并调整球台位置"""
+        # 检查选手是否存在
+        if player not in self.players:
+            return False
+        
+        # 找到对应的球台
+        table = None
+        for t in self.tables:
+            if t.table_id == table_id:
+                table = t
+                break
+        
+        if not table:
+            return False
+        
+        # HP减1
+        player.current_lives -= 1
+        
+        # 记录选手的原始位置
+        was_host = (table.host == player)
+        was_challenger = (table.challenger == player)
+        
+        # 根据HP值决定移动位置
+        if player.current_lives <= 0:
+            # HP为0，移动到淘汰区（彻底被淘汰）
+            player.current_lives = 0
+            self.move_to_eliminated(player, table_id)
+            
+            # 如果被淘汰的是挑战者，需要调整球台位置
+            if was_challenger:
+                self.adjust_table_positions_after_challenger_elimination(table)
+        else:
+            # HP大于0，移动到候补区尾部（本局离场）
+            self.move_to_waiting(player, table_id)
+            
+            # 本局离场需要调整球台位置
+            if was_host:
+                self.adjust_table_positions_after_host_elimination(table)
+            elif was_challenger:
+                self.adjust_table_positions_after_challenger_elimination(table)
+        
+        return True
+    
+    def adjust_table_positions_after_host_elimination(self, table):
+        """擂主被淘汰后调整球台位置"""
+        # 挑战者变成擂主
+        if table.challenger:
+            table.host = table.challenger
+            table.host.position = f"{table.table_id}号台擂主"
+            table.challenger = None
+        else:
+            table.host = None
+        
+        # 候补者补位成挑战者
+        if table.waiting:
+            table.challenger = table.waiting.pop(0)
+            table.challenger.position = f"{table.table_id}号台挑战者"
+        
+        # 从场外候补区头部选择进入这张球台的候补区
+        if self.outside_waiting and table.active:
+            new_waiting = self.outside_waiting.pop(0)
+            table.waiting.append(new_waiting)
+            new_waiting.position = f"{table.table_id}号台候补"
+            new_waiting.table_id = table.table_id
+    
+    def adjust_table_positions_after_challenger_elimination(self, table):
+        """挑战者被淘汰后调整球台位置"""
+        # 擂主不变
+        # 候补者补位成挑战者
+        if table.waiting:
+            table.challenger = table.waiting.pop(0)
+            table.challenger.position = f"{table.table_id}号台挑战者"
+        else:
+            table.challenger = None
+        
+        # 从场外候补区头部选择进入这张球台的候补区
+        if self.outside_waiting and table.active:
+            new_waiting = self.outside_waiting.pop(0)
+            table.waiting.append(new_waiting)
+            new_waiting.position = f"{table.table_id}号台候补"
+            new_waiting.table_id = table.table_id
+    
+    def move_to_waiting(self, player, table_id):
+        """将选手移动到候补区尾部"""
+        # 从当前位置移除选手
+        self.remove_player_from_current_position(player, table_id)
+        
+        # 移动到场外候补区尾部（本局离场）
+        self.outside_waiting.append(player)
+        player.position = "场外候补"
+        player.table_id = None
+    
+    def move_to_eliminated(self, player, table_id):
+        """将选手移动到淘汰区"""
+        # 从当前位置移除选手
+        self.remove_player_from_current_position(player, table_id)
+        
+        # 移动到淘汰区
+        self.eliminated.append(player)
+        player.position = "已淘汰"
+        player.table_id = None
+    
+    def remove_player_from_current_position(self, player, table_id):
+        """从当前位置移除选手"""
+        # 从球台移除
+        for table in self.tables:
+            if table.table_id == table_id:
+                if table.host == player:
+                    table.host = None
+                elif table.challenger == player:
+                    table.challenger = None
+                elif player in table.waiting:
+                    table.waiting.remove(player)
+                break
+        
+        # 从场外候补区移除
+        if player in self.outside_waiting:
+            self.outside_waiting.remove(player)
+    
     def update(self):
         if self.game_state != "running":
             return

@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import ttk, scrolledtext
+from tkinter import ttk, scrolledtext, messagebox
 from models import Game
 
 class CrazySaturdayApp:
@@ -22,7 +22,10 @@ class CrazySaturdayApp:
             ('郑三十五', 5), ('王三十六', 4)
         ]
         
-        # 初始选手列表为空，用户需要手动添加选手
+        # 默认装载示例选手
+        self.game = Game()
+        for name, lives in self.example_players:
+            self.game.add_player(name, lives)
         
         self.create_setup_screen()
     
@@ -240,11 +243,21 @@ class CrazySaturdayApp:
         tables_canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
         tables_canvas.configure(yscrollcommand=scrollbar.set)
         
-        # 显示球台
+        # 显示球台 - 水平排列
+        row_frame = None
+        tables_per_row = 3  # 每行显示3个球台
+        table_count = 0
+        
         for table in self.game.tables:
             if table.active:
-                table_frame = ttk.LabelFrame(scrollable_frame, text=f"{table.table_id}号球台")
-                table_frame.pack(fill='x', padx=5, pady=5)
+                # 每行开始时创建新的行框架
+                if table_count % tables_per_row == 0:
+                    row_frame = tk.Frame(scrollable_frame)
+                    row_frame.pack(fill='x', padx=5, pady=5)
+                
+                table_frame = ttk.LabelFrame(row_frame, text=f"{table.table_id}号球台", width=300)
+                table_frame.pack(side='left', fill='both', expand=True, padx=5, pady=5)
+                table_count += 1
                 
                 # 擂主
                 host_text = f"擂主: {table.host.name if table.host else '无'}"
@@ -254,10 +267,33 @@ class CrazySaturdayApp:
                 else:
                     host_color = 'black'
                 
-                host_label = tk.Label(table_frame, text=host_text, fg=host_color, anchor='w')
-                host_label.pack(fill='x', padx=10)
+                # 擂主区域 - 包含本局离场按钮和选手信息
+                host_frame = tk.Frame(table_frame)
+                host_frame.pack(fill='x', padx=10)
                 
-                # 挑战者
+                # 擂主本局离场按钮
+                if table.host:
+                    host_button = tk.Button(host_frame, text="本局离场", width=8, bg='yellow',
+                                          command=lambda p=table.host, tid=table.table_id: 
+                                          self.eliminate_player(p, tid, "擂主"))
+                    host_button.pack(side='left', padx=(0, 5))
+                
+                # 擂主信息标签
+                host_label = tk.Label(host_frame, text=host_text, fg=host_color, anchor='w')
+                host_label.pack(side='left', fill='x', expand=True)
+                
+                # 挑战者区域 - 包含本局离场按钮和选手信息
+                challenger_frame = tk.Frame(table_frame)
+                challenger_frame.pack(fill='x', padx=10)
+                
+                # 挑战者本局离场按钮
+                if table.challenger:
+                    challenger_button = tk.Button(challenger_frame, text="本局离场", width=8, bg='yellow',
+                                                 command=lambda p=table.challenger, tid=table.table_id: 
+                                                 self.eliminate_player(p, tid, "挑战者"))
+                    challenger_button.pack(side='left', padx=(0, 5))
+                
+                # 挑战者信息标签
                 challenger_text = f"挑战者: {table.challenger.name if table.challenger else '无'}"
                 if table.challenger:
                     challenger_text += f" ({table.challenger.current_lives}/{table.challenger.initial_lives})"
@@ -265,12 +301,34 @@ class CrazySaturdayApp:
                 else:
                     challenger_color = 'black'
                 
-                challenger_label = tk.Label(table_frame, text=challenger_text, fg=challenger_color, anchor='w')
-                challenger_label.pack(fill='x', padx=10)
+                challenger_label = tk.Label(challenger_frame, text=challenger_text, fg=challenger_color, anchor='w')
+                challenger_label.pack(side='left', fill='x', expand=True)
                 
-                # 候补
-                waiting_label = tk.Label(table_frame, text=f"候补: {len(table.waiting)}人", anchor='w')
-                waiting_label.pack(fill='x', padx=10)
+                # 候补 - 显示详细信息（候补选手不能被淘汰）
+                waiting_frame = tk.Frame(table_frame)
+                waiting_frame.pack(fill='x', padx=10)
+                
+                # 候补区域占位按钮（保持对齐）
+                placeholder_button = tk.Button(waiting_frame, text="", width=8, state='disabled')
+                placeholder_button.pack(side='left', padx=(0, 5))
+                
+                if table.waiting:
+                    # 显示候补选手姓名和HP值
+                    waiting_label = tk.Label(waiting_frame, text="候补:", anchor='w')
+                    waiting_label.pack(side='left')
+                    
+                    for i, player in enumerate(table.waiting):
+                        player_text = f"{player.name}({player.current_lives}/{player.initial_lives})"
+                        if i > 0:
+                            player_text = "，" + player_text
+                        
+                        player_label = tk.Label(waiting_frame, text=player_text, anchor='w')
+                        player_label.pack(side='left')
+                        
+                        # 候补选手不能被下场，不绑定右键菜单
+                else:
+                    waiting_label = tk.Label(waiting_frame, text="候补: 0人", anchor='w')
+                    waiting_label.pack(side='left', fill='x', expand=True)
         
         tables_canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
@@ -307,14 +365,9 @@ class CrazySaturdayApp:
         
         notebook.pack(fill='both', expand=True, pady=5)
         
-        # 底部控制区域
+        # 底部状态显示区域
         bottom_frame = tk.Frame(self.root)
         bottom_frame.pack(fill='x', pady=10)
-        
-        next_button = tk.Button(bottom_frame, text="下一步", 
-                               command=self.next_step,
-                               bg='blue', fg='white', font=('Arial', 12, 'bold'))
-        next_button.pack(side='left', padx=20)
         
         status_label = tk.Label(bottom_frame, 
                               text=f"剩余选手: {self.game.get_remaining_players_count()}",
@@ -710,6 +763,36 @@ class CrazySaturdayApp:
     def start_game(self):
         if self.game.start_game():
             self.create_game_screen()
+    
+    # 右键菜单功能已删除，改用本局离场按钮
+    
+    def eliminate_player(self, player, table_id, position):
+        """选手本局离场"""
+        print(f"DEBUG: eliminate_player 被调用 - 选手: {player.name}, 球台: {table_id}, 位置: {position}")
+        
+        # 确认对话框
+        confirm = messagebox.askyesno(
+            "确认本局离场", 
+            f"确定要让选手 {player.name} 本局离场吗？\n\n当前HP: {player.current_lives}/{player.initial_lives}"
+        )
+        
+        if not confirm:
+            print("DEBUG: 用户取消了本局离场操作")
+            return
+        
+        print("DEBUG: 用户确认了本局离场操作")
+        
+        # 执行离场逻辑
+        success = self.game.eliminate_player(player, table_id)
+        
+        if success:
+            print("DEBUG: 本局离场逻辑执行成功")
+            # 刷新界面
+            self.create_game_screen()
+            messagebox.showinfo("离场成功", f"选手 {player.name} 已本局离场")
+        else:
+            print("DEBUG: 本局离场逻辑执行失败")
+            messagebox.showerror("离场失败", "本局离场操作失败，请重试")
     
     def next_step(self):
         self.game.update()
