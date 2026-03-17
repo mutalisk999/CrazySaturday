@@ -69,12 +69,40 @@ class Game:
         
         # 球台使用顺序
         self.table_priority = [2, 3, 4, 5, 6, 7, 8, 9, 1]
-        self.table_close_order = [1, 9, 8, 7, 6, 5, 4, 3, 2]
+        self.table_close_order = [1, 9, 8, 7, 6, 5, 4, 3, 2]  # 减桌顺序：优先撤最后使用的球台
         
         # 人数阈值对应的球台数量
         self.table_thresholds = {
             2: 1, 7: 2, 11: 3, 15: 4, 18: 5, 21: 6, 25: 7, 28: 8, 32: 9
         }
+        
+        # 减桌相关状态
+        self.tables_to_close = {}  # 需要关闭的球台字典 {table_id: True}
+        self.closing_tables = {}   # 正在关闭过程中的球台
+        self.table_reduction_callback = None  # 减桌回调函数
+    
+    def calculate_required_tables(self, player_count: int) -> int:
+        """根据选手数量计算需要的球台数量"""
+        if player_count < 2:
+            return 0
+        elif player_count <= 6:
+            return 1
+        elif player_count <= 10:
+            return 2
+        elif player_count <= 14:
+            return 3
+        elif player_count <= 17:
+            return 4
+        elif player_count <= 20:
+            return 5
+        elif player_count <= 24:
+            return 6
+        elif player_count <= 27:
+            return 7
+        elif player_count <= 31:
+            return 8
+        else:
+            return 9
     
     def setup_tables(self, player_count: int):
         # 根据人数确定球台数量
@@ -142,41 +170,213 @@ class Game:
     def get_remaining_players_count(self):
         return len([p for p in self.players if not p.is_eliminated()])
     
+    def set_table_reduction_callback(self, callback):
+        """设置减桌回调函数"""
+        self.table_reduction_callback = callback
+    
+    def get_table_players_info(self, table):
+        """获取球台选手信息"""
+        players_info = []
+        
+        if table.host:
+            players_info.append(f"擂主: {table.host.name}({table.host.current_lives}/{table.host.initial_lives})")
+        if table.challenger:
+            players_info.append(f"挑战者: {table.challenger.name}({table.challenger.current_lives}/{table.challenger.initial_lives})")
+        for i, player in enumerate(table.waiting):
+            players_info.append(f"候补{i+1}: {player.name}({player.current_lives}/{player.initial_lives})")
+        
+        return "\n".join(players_info) if players_info else "无选手"
+    
     def check_table_reduction(self):
+        """检查是否需要减少球台"""
         remaining_players = self.get_remaining_players_count()
         
-        # 检查是否需要减少球台
-        for threshold, table_count in self.table_thresholds.items():
-            if remaining_players == threshold - 1:
-                # 需要关闭球台
-                tables_to_close = self.table_close_order[:len(self.tables) - table_count + 1]
-                for table_id in tables_to_close:
-                    if table_id in [t.table_id for t in self.tables if t.active]:
-                        self.close_table(table_id)
+        # 先清理已关闭的球台标记
+        self.cleanup_closed_tables()
+        
+        # 清理后再计算当前球台数
+        current_tables = self.get_active_tables_count()
+        required_tables = self.calculate_required_tables(remaining_players)
+        
+        print(f"DEBUG: 减桌检查 - 剩余选手: {remaining_players}, 当前球台: {current_tables}, 需要球台: {required_tables}")
+        print(f"DEBUG: tables_to_close: {list(self.tables_to_close.keys())}, closing_tables: {list(self.closing_tables.keys())}")
+        
+        if current_tables > required_tables:
+            # 需要减少球台
+            tables_to_close_count = current_tables - required_tables
+            # 计算还需要标记多少个球台（排除已标记的）
+            already_marked = len(self.tables_to_close)
+            still_needed = max(0, tables_to_close_count - already_marked)
+            print(f"DEBUG: 需要减少 {tables_to_close_count} 张球台，已标记 {already_marked} 张，还需标记 {still_needed} 张")
+            if still_needed > 0:
+                self.identify_tables_to_close(still_needed)
+        else:
+            # 如果不需要减桌，清理所有减桌标记
+            if self.tables_to_close:
+                print(f"DEBUG: 当前球台数({current_tables}) <= 需要球台数({required_tables})，清理所有减桌标记")
+                self.tables_to_close.clear()
+                self.closing_tables.clear()
     
-    def close_table(self, table_id: int):
-        for table in self.tables:
-            if table.table_id == table_id and table.active:
-                table.active = False
-                
-                # 将球台上的选手移到场外候补区
-                if table.host:
-                    self.outside_waiting.append(table.host)
-                    table.host.position = "场外候补"
-                    table.host.table_id = None
-                if table.challenger:
-                    self.outside_waiting.append(table.challenger)
-                    table.challenger.position = "场外候补"
-                    table.challenger.table_id = None
-                for player in table.waiting:
-                    self.outside_waiting.append(player)
-                    player.position = "场外候补"
-                    player.table_id = None
-                
-                table.host = None
-                table.challenger = None
-                table.waiting = []
+    def identify_tables_to_close(self, count: int):
+        """标识需要关闭的球台"""
+        print(f"DEBUG: identify_tables_to_close - count: {count}")
+        print(f"DEBUG: table_close_order: {self.table_close_order}")
+        
+        # 按照减桌顺序标识球台
+        tables_identified = 0
+        for table_id in self.table_close_order:
+            if tables_identified >= count:
+                print(f"DEBUG: 已达到需要关闭的球台数量({count})，停止标识")
                 break
+                
+            table = self.get_table_by_id(table_id)
+            print(f"DEBUG: 检查球台 {table_id}: active={table.active if table else None}, in_tables_to_close={table_id in self.tables_to_close if table else None}")
+            
+            if table and table.active and table_id not in self.tables_to_close:
+                # 检查球台是否可以立即关闭
+                if self.can_close_table_immediately(table):
+                    print(f"DEBUG: 球台 {table_id} 可以立即关闭")
+                    self.close_table_immediately(table)
+                else:
+                    # 标记为需要关闭的球台
+                    print(f"DEBUG: 标记球台 {table_id} 为需要关闭")
+                    self.tables_to_close[table_id] = True
+                    self.closing_tables[table_id] = table
+                tables_identified += 1
+                print(f"DEBUG: 已标识 {tables_identified} 张球台")
+        
+        print(f"DEBUG: 已标记 {tables_identified} 张球台需要关闭")
+    
+    def cleanup_closed_tables(self):
+        """清理已关闭的球台标记"""
+        # 移除已经关闭的球台标记
+        tables_to_remove = []
+        for table_id in self.tables_to_close:
+            table = self.get_table_by_id(table_id)
+            if not table or not table.active:
+                tables_to_remove.append(table_id)
+        
+        for table_id in tables_to_remove:
+            if table_id in self.tables_to_close:
+                del self.tables_to_close[table_id]
+            if table_id in self.closing_tables:
+                del self.closing_tables[table_id]
+            print(f"DEBUG: 清理已关闭球台 {table_id} 的标记")
+    
+    def cleanup_closing_tables_if_needed(self, required_tables):
+        """如果不需要减桌，清理多余的球台标记"""
+        current_tables = self.get_active_tables_count()
+        
+        # 如果当前球台数等于或小于需要球台数，清理所有标记
+        if current_tables <= required_tables and self.tables_to_close:
+            print(f"DEBUG: 当前球台数({current_tables}) <= 需要球台数({required_tables})，清理所有减桌标记")
+            self.tables_to_close.clear()
+            self.closing_tables.clear()
+    
+    def can_close_table_immediately(self, table):
+        """检查球台是否可以立即关闭"""
+        # 如果球台没有任何选手或候补者，可以立即关闭
+        return table.host is None and table.challenger is None and len(table.waiting) == 0
+    
+    def close_table_immediately(self, table):
+        """立即关闭球台"""
+        table.active = False
+        print(f"球台 {table.table_id} 已立即关闭")
+    
+    def process_closing_table_after_elimination(self, table):
+        """处理被标记为需要关闭的球台在本局离场后的逻辑"""
+        if table.table_id not in self.tables_to_close:
+            return
+            
+        # 候补者成为擂主或挑战者，不需要从场外候补区补充
+        if table.waiting:
+            # 候补者补位
+            if table.challenger is None:
+                table.challenger = table.waiting.pop(0)
+                table.challenger.position = f"{table.table_id}号台挑战者"
+            elif table.host is None:
+                table.host = table.waiting.pop(0)
+                table.host.position = f"{table.table_id}号台擂主"
+        
+        # 检查是否可以最终关闭球台
+        if self.can_finally_close_table(table):
+            self.finalize_table_closing(table)
+    
+    def can_finally_close_table(self, table):
+        """检查是否可以最终关闭球台"""
+        # 被标记球台：当擂主和挑战者只有一方存在时，就可以最终关闭
+        # 不允许从场外候补区新增候补
+        return (table.host is not None and table.challenger is None) or \
+               (table.host is None and table.challenger is not None)
+    
+    def finalize_table_closing(self, table):
+        """最终关闭球台"""
+        # 被标记球台：当擂主和挑战者只有一方存在时，就可以最终关闭
+        # 存在的一方需要移动到场外候补区尾部
+        
+        # 在真正触发撤桌行为时弹出对话框
+        if self.table_reduction_callback:
+            players_info = self.get_table_players_info(table)
+            self.table_reduction_callback(table.table_id, players_info)
+        
+        # 处理擂主（如果存在）
+        if table.host:
+            if table.host.current_lives > 0:
+                # HP大于0，进入场外候补区尾部
+                self.outside_waiting.append(table.host)
+                table.host.position = "场外候补"
+            else:
+                # HP等于0，进入淘汰区
+                self.eliminated.append(table.host)
+                table.host.position = "已淘汰"
+            table.host.table_id = None
+            table.host = None
+        
+        # 处理挑战者（如果存在）
+        if table.challenger:
+            if table.challenger.current_lives > 0:
+                # HP大于0，进入场外候补区尾部
+                self.outside_waiting.append(table.challenger)
+                table.challenger.position = "场外候补"
+            else:
+                # HP等于0，进入淘汰区
+                self.eliminated.append(table.challenger)
+                table.challenger.position = "已淘汰"
+            table.challenger.table_id = None
+            table.challenger = None
+        
+        # 清空候补区
+        for player in table.waiting:
+            if player.current_lives > 0:
+                self.outside_waiting.append(player)
+                player.position = "场外候补"
+            else:
+                self.eliminated.append(player)
+                player.position = "已淘汰"
+            player.table_id = None
+        table.waiting = []
+        
+        table.active = False
+        if table.table_id in self.tables_to_close:
+            del self.tables_to_close[table.table_id]
+        del self.closing_tables[table.table_id]
+        
+        # 根据情况输出不同的关闭信息
+        if table.host is not None and table.challenger is not None:
+            print(f"球台 {table.table_id} 已最终关闭，擂主和挑战者双双被移除")
+        elif table.host is not None:
+            print(f"球台 {table.table_id} 已最终关闭，擂主移动到场外候补区尾部")
+        elif table.challenger is not None:
+            print(f"球台 {table.table_id} 已最终关闭，挑战者移动到场外候补区尾部")
+        else:
+            print(f"球台 {table.table_id} 已最终关闭")
+    
+    def get_table_by_id(self, table_id: int):
+        """根据ID获取球台"""
+        for table in self.tables:
+            if table.table_id == table_id:
+                return table
+        return None
     
     def play_match(self, table: Table):
         if not table.has_match():
@@ -221,7 +421,8 @@ class Game:
             table.challenger = None
         
         # 场外候补区第一个成为球台候补
-        if self.outside_waiting and table.active:
+        # 如果球台没有被标记为需要关闭，从场外候补区补充
+        if table.table_id not in self.tables_to_close and self.outside_waiting and table.active:
             new_waiting = self.outside_waiting.pop(0)
             table.waiting.append(new_waiting)
             new_waiting.position = f"{table.table_id}号台候补"
@@ -269,6 +470,13 @@ class Game:
             elif was_challenger:
                 self.adjust_table_positions_after_challenger_elimination(table)
         
+        # 检查是否需要减桌
+        self.check_table_reduction()
+        
+        # 如果这个球台被标记为需要关闭，处理减桌逻辑
+        if table.table_id in self.tables_to_close:
+            self.process_closing_table_after_elimination(table)
+        
         return True
     
     def adjust_table_positions_after_host_elimination(self, table):
@@ -287,7 +495,8 @@ class Game:
             table.challenger.position = f"{table.table_id}号台挑战者"
         
         # 从场外候补区头部选择进入这张球台的候补区
-        if self.outside_waiting and table.active:
+        # 如果球台没有被标记为需要关闭，从场外候补区补充
+        if table.table_id not in self.tables_to_close and self.outside_waiting and table.active:
             new_waiting = self.outside_waiting.pop(0)
             table.waiting.append(new_waiting)
             new_waiting.position = f"{table.table_id}号台候补"
@@ -296,19 +505,34 @@ class Game:
     def adjust_table_positions_after_challenger_elimination(self, table):
         """挑战者被淘汰后调整球台位置"""
         # 擂主不变
-        # 候补者补位成挑战者
+        
+        # 首先尝试从候补区补位
         if table.waiting:
             table.challenger = table.waiting.pop(0)
             table.challenger.position = f"{table.table_id}号台挑战者"
+            table.challenger.table_id = table.table_id  # 确保设置table_id
+            
+            # 如果候补区有选手补位成挑战者，从场外候补区补充候补选手
+            if table.table_id not in self.tables_to_close and self.outside_waiting and table.active:
+                new_waiting = self.outside_waiting.pop(0)
+                table.waiting.append(new_waiting)
+                new_waiting.position = f"{table.table_id}号台候补"
+                new_waiting.table_id = table.table_id
         else:
-            table.challenger = None
-        
-        # 从场外候补区头部选择进入这张球台的候补区
-        if self.outside_waiting and table.active:
-            new_waiting = self.outside_waiting.pop(0)
-            table.waiting.append(new_waiting)
-            new_waiting.position = f"{table.table_id}号台候补"
-            new_waiting.table_id = table.table_id
+            # 如果候补区为空，尝试从场外候补区补充挑战者
+            if table.table_id not in self.tables_to_close and self.outside_waiting and table.active:
+                table.challenger = self.outside_waiting.pop(0)
+                table.challenger.position = f"{table.table_id}号台挑战者"
+                table.challenger.table_id = table.table_id
+                
+                # 如果场外候补区还有更多选手，补充候补选手
+                if self.outside_waiting and table.active:
+                    new_waiting = self.outside_waiting.pop(0)
+                    table.waiting.append(new_waiting)
+                    new_waiting.position = f"{table.table_id}号台候补"
+                    new_waiting.table_id = table.table_id
+            else:
+                table.challenger = None
     
     def move_to_waiting(self, player, table_id):
         """将选手移动到候补区尾部"""

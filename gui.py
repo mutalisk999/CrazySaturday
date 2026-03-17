@@ -11,21 +11,24 @@ class CrazySaturdayApp:
         
         # 示例选手列表（用于重新开始游戏时使用）
         self.example_players = [
-            ('张三', 4), ('李四', 5), ('王五', 3), ('赵六', 6),
-            ('钱七', 4), ('孙八', 5), ('周九', 3), ('吴十', 4),
-            ('郑十一', 5), ('王十二', 4), ('李十三', 3), ('赵十四', 6),
-            ('钱十五', 4), ('孙十六', 5), ('周十七', 3), ('吴十八', 4),
-            ('郑十九', 5), ('王二十', 4), ('李二十一', 3), ('赵二十二', 6),
-            ('钱二十三', 4), ('孙二十四', 5), ('周二十五', 3), ('吴二十六', 4),
-            ('郑二十七', 5), ('王二十八', 4), ('李二十九', 3), ('赵三十', 6),
-            ('钱三十一', 4), ('孙三十二', 5), ('周三十三', 3), ('吴三十四', 4),
-            ('郑三十五', 5), ('王三十六', 4)
+            ('张三', 2), ('李四', 3), ('王五', 2), ('赵六', 3),
+            ('钱七', 2), ('孙八', 3), ('周九', 2), ('吴十', 3),
+            ('郑十一', 2), ('王十二', 3), ('李十三', 2), ('赵十四', 3),
+            ('钱十五', 2), ('孙十六', 3), ('周十七', 2), ('吴十八', 3),
+            ('郑十九', 2), ('王二十', 3), ('李二十一', 2), ('赵二十二', 3),
+            ('钱二十三', 2), ('孙二十四', 3), ('周二十五', 2), ('吴二十六', 3),
+            ('郑二十七', 2), ('王二十八', 3), ('李二十九', 2), ('赵三十', 3),
+            ('钱三十一', 2), ('孙三十二', 3), ('周三十三', 2), ('吴三十四', 3),
+            ('郑三十五', 2), ('王三十六', 3)
         ]
         
         # 默认装载示例选手
         self.game = Game()
         for name, lives in self.example_players:
             self.game.add_player(name, lives)
+        
+        # 设置减桌回调函数
+        self.game.set_table_reduction_callback(self.show_table_reduction_dialog)
         
         self.create_setup_screen()
     
@@ -64,6 +67,10 @@ class CrazySaturdayApp:
         
         # 配置表格样式 - 显示行和列分隔线
         style = ttk.Style()
+        
+        # 创建红色边框样式
+        style.configure('Red.TLabelframe', borderwidth=3, relief='solid', bordercolor='red')
+        style.configure('Red.TLabelframe.Label', foreground='red')
         
         # 配置Treeview样式，显示网格线
         style.configure("Custom.Treeview", 
@@ -250,13 +257,26 @@ class CrazySaturdayApp:
         
         for table in self.game.tables:
             if table.active:
+                # 检查球台是否被标记为需要关闭
+                is_closing_table = table.table_id in self.game.tables_to_close
+                
                 # 每行开始时创建新的行框架
                 if table_count % tables_per_row == 0:
                     row_frame = tk.Frame(scrollable_frame)
                     row_frame.pack(fill='x', padx=5, pady=5)
                 
-                table_frame = ttk.LabelFrame(row_frame, text=f"{table.table_id}号球台", width=300)
+                # 根据是否即将撤桌设置标题颜色
+                title_text = f"{table.table_id}号球台"
+                if is_closing_table:
+                    title_text += " (即将撤桌)"
+                
+                table_frame = ttk.LabelFrame(row_frame, text=title_text, width=300)
                 table_frame.pack(side='left', fill='both', expand=True, padx=5, pady=5)
+                
+                # 设置边框颜色
+                if is_closing_table:
+                    table_frame.configure(style='Red.TLabelframe')
+                
                 table_count += 1
                 
                 # 擂主
@@ -793,6 +813,16 @@ class CrazySaturdayApp:
         else:
             print("DEBUG: 本局离场逻辑执行失败")
             messagebox.showerror("离场失败", "本局离场操作失败，请重试")
+    
+    def show_table_reduction_dialog(self, table_id, players_info):
+        """显示减桌对话框"""
+        messagebox.showinfo(
+            "球台撤桌通知",
+            f"{table_id}号球台需要撤桌！\n\n"
+            f"该球台的选手需要移步到场外候补区等待：\n"
+            f"{players_info}\n\n"
+            f"请确认继续操作。"
+        )
     
     def next_step(self):
         self.game.update()
