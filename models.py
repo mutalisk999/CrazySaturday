@@ -80,6 +80,9 @@ class Game:
         self.tables_to_close = {}  # 需要关闭的球台字典 {table_id: True}
         self.closing_tables = {}   # 正在关闭过程中的球台
         self.table_reduction_callback = None  # 减桌回调函数
+        
+        # 已离场桌台队列（用于重新安排选手）
+        self.leftover_tables_queue = []  # 已离场的桌台号队列
     
     def calculate_required_tables(self, player_count: int) -> int:
         """根据选手数量计算需要的球台数量"""
@@ -420,6 +423,10 @@ class Game:
         else:
             table.challenger = None
         
+        # 将桌台加入已离场桌台队列（如果不在队列中且未被标记为需要关闭）
+        if table.table_id not in self.leftover_tables_queue and table.table_id not in self.tables_to_close:
+            self.leftover_tables_queue.append(table.table_id)
+        
         # 场外候补区第一个成为球台候补
         # 如果球台没有被标记为需要关闭，从场外候补区补充
         if table.table_id not in self.tables_to_close and self.outside_waiting and table.active:
@@ -571,6 +578,60 @@ class Game:
         if player in self.outside_waiting:
             self.outside_waiting.remove(player)
     
+    def fill_leftover_tables(self):
+        """从已离场桌台队列头部开始安排场外候补选手上桌"""
+        while self.leftover_tables_queue and self.outside_waiting:
+            # 获取队列头部的桌台号
+            table_id = self.leftover_tables_queue[0]
+            table = self.get_table_by_id(table_id)
+            
+            if not table or not table.active:
+                # 桌台不存在或不活跃，从队列中移除
+                self.leftover_tables_queue.pop(0)
+                continue
+            
+            # 如果桌台被标记为需要关闭，从队列中移除
+            if table_id in self.tables_to_close:
+                self.leftover_tables_queue.pop(0)
+                continue
+            
+            # 检查桌台的空位情况
+            host_needed = table.host is None
+            challenger_needed = table.challenger is None
+            waiting_needed = len(table.waiting) < 1  # 最多1个候补
+            
+            if not host_needed and not challenger_needed and not waiting_needed:
+                # 桌台已满员，从队列中移除
+                self.leftover_tables_queue.pop(0)
+                continue
+            
+            # 安排场外候补选手上桌
+            player = self.outside_waiting[0]
+            
+            if host_needed:
+                # 安排为擂主
+                self.outside_waiting.pop(0)
+                table.host = player
+                player.position = f"{table.table_id}号台擂主"
+                player.table_id = table.table_id
+            elif challenger_needed:
+                # 安排为挑战者
+                self.outside_waiting.pop(0)
+                table.challenger = player
+                player.position = f"{table.table_id}号台挑战者"
+                player.table_id = table.table_id
+            elif waiting_needed:
+                # 安排为候补
+                self.outside_waiting.pop(0)
+                table.waiting.append(player)
+                player.position = f"{table.table_id}号台候补"
+                player.table_id = table.table_id
+            
+            # 检查桌台是否已满员
+            if table.host is not None and table.challenger is not None and len(table.waiting) >= 1:
+                # 桌台已满员，从队列中移除
+                self.leftover_tables_queue.pop(0)
+    
     def update(self):
         if self.game_state != "running":
             return
@@ -590,3 +651,6 @@ class Game:
         for table in self.tables:
             if table.active and table.has_match():
                 self.play_match(table)
+        
+        # 处理已离场桌台队列，安排场外候补选手上桌
+        self.fill_leftover_tables()

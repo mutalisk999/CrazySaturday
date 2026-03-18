@@ -807,6 +807,8 @@ class CrazySaturdayApp:
         
         if success:
             print("DEBUG: 本局离场逻辑执行成功")
+            # 离场后立即触发上场逻辑（安排场外候补选手上桌）
+            self.game.fill_leftover_tables()
             # 刷新界面
             self.create_game_screen()
             messagebox.showinfo("离场成功", f"选手 {player.name} 已本局离场")
