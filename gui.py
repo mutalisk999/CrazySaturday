@@ -367,9 +367,17 @@ class CrazySaturdayApp:
         waiting_text = scrolledtext.ScrolledText(waiting_frame, width=28, height=10)
         waiting_text.pack(fill='both', expand=True, padx=5, pady=5)
         
-        waiting_players = [f"{p.name} ({p.current_lives}/{p.initial_lives})" 
-                          for p in self.game.outside_waiting]
-        waiting_text.insert('1.0', '\n'.join(waiting_players) if waiting_players else "暂无选手")
+        # 插入场外候补选手，HP为1的显示为红色
+        if self.game.outside_waiting:
+            for p in self.game.outside_waiting:
+                if p.current_lives == 1:
+                    # HP为1的选手显示为红色
+                    waiting_text.insert('end', f"{p.name} ({p.current_lives}/{p.initial_lives})\n", 'red')
+                else:
+                    waiting_text.insert('end', f"{p.name} ({p.current_lives}/{p.initial_lives})\n")
+            waiting_text.tag_config('red', foreground='red')
+        else:
+            waiting_text.insert('1.0', "暂无选手")
         waiting_text.config(state='disabled')
         
         # 已淘汰选手区选项卡
@@ -793,7 +801,7 @@ class CrazySaturdayApp:
         # 确认对话框
         confirm = messagebox.askyesno(
             "确认本局离场", 
-            f"确定要让选手 {player.name} 本局离场吗？\n\n当前HP: {player.current_lives}/{player.initial_lives}"
+            f"确定要让 {table_id} 号台的 {player.name} 本局离场吗？\n\n当前HP: {player.current_lives}/{player.initial_lives}"
         )
         
         if not confirm:
@@ -808,10 +816,14 @@ class CrazySaturdayApp:
         if success:
             print("DEBUG: 本局离场逻辑执行成功")
             # 离场后立即触发上场逻辑（安排场外候补选手上桌）
-            self.game.fill_leftover_tables()
+            安排信息 = self.game.fill_leftover_tables()
             # 刷新界面
             self.create_game_screen()
             messagebox.showinfo("离场成功", f"选手 {player.name} 已本局离场")
+            
+            # 如果有安排选手上桌的信息，弹出对话框
+            if 安排信息:
+                messagebox.showinfo("安排选手上桌", 安排信息)
         else:
             print("DEBUG: 本局离场逻辑执行失败")
             messagebox.showerror("离场失败", "本局离场操作失败，请重试")
