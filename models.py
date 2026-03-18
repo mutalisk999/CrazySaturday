@@ -467,6 +467,9 @@ class Game:
             # 如果被淘汰的是挑战者，需要调整球台位置
             if was_challenger:
                 self.adjust_table_positions_after_challenger_elimination(table)
+            # 如果被淘汰的是擂主，需要调整球台位置
+            elif was_host:
+                self.adjust_table_positions_after_host_elimination(table)
         else:
             # HP大于0，移动到候补区尾部（本局离场）
             self.move_to_waiting(player, table_id)
@@ -600,6 +603,12 @@ class Game:
             challenger_needed = table.challenger is None
             waiting_needed = len(table.waiting) < 1  # 最多1个候补
             
+            # 根据bug0318.md文档的规则：
+            # - 如果挑战者和候补者都为空就需要安排挑战者和候补者
+            # - 如果挑战者不为空但是候补者为空就安排候补者
+            # - 如果挑战者为空但候补者不为空，不需要安排（这种情况不应该发生，因为擂主应该在）
+            
+            # 检查是否需要安排选手
             if not host_needed and not challenger_needed and not waiting_needed:
                 # 桌台已满员，从队列中移除
                 self.leftover_tables_queue.pop(0)
@@ -631,6 +640,7 @@ class Game:
             if table.host is not None and table.challenger is not None and len(table.waiting) >= 1:
                 # 桌台已满员，从队列中移除
                 self.leftover_tables_queue.pop(0)
+            # 如果没有满员安排（部分安排或者未安排上），就需要继续保留这个桌号，等待下次安排
     
     def update(self):
         if self.game_state != "running":
