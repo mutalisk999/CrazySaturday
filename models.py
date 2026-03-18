@@ -591,9 +591,6 @@ class Game:
     
     def fill_leftover_tables(self):
         """从已离场桌台队列头部开始安排场外候补选手上桌"""
-        # 收集安排信息
-        安排信息列表 = []
-        
         while self.leftover_tables_queue and self.outside_waiting:
             # 获取队列头部的桌台号
             table_id = self.leftover_tables_queue[0]
@@ -634,36 +631,24 @@ class Game:
                 table.host = player
                 player.position = f"{table.table_id}号台擂主"
                 player.table_id = table.table_id
-                安排信息列表.append(f"安排 {player.name} 成为 {table.table_id} 号台的 擂主")
             elif challenger_needed:
                 # 安排为挑战者
                 self.outside_waiting.pop(0)
                 table.challenger = player
                 player.position = f"{table.table_id}号台挑战者"
                 player.table_id = table.table_id
-                安排信息列表.append(f"安排 {player.name} 成为 {table.table_id} 号台的 挑战者")
             elif waiting_needed:
                 # 安排为候补
                 self.outside_waiting.pop(0)
                 table.waiting.append(player)
                 player.position = f"{table.table_id}号台候补"
                 player.table_id = table.table_id
-                安排信息列表.append(f"安排 {player.name} 成为 {table.table_id} 号台的 候补者")
             
             # 检查桌台是否已满员
             if table.host is not None and table.challenger is not None and len(table.waiting) >= 1:
                 # 桌台已满员，从队列中移除
                 self.leftover_tables_queue.pop(0)
             # 如果没有满员安排（部分安排或者未安排上），就需要继续保留这个桌号，等待下次安排
-        
-        # 如果有安排信息，弹出对话框
-        if 安排信息列表:
-            安排信息文本 = "\n".join(安排信息列表)
-            print(f"DEBUG: 安排选手上桌 - \n{安排信息文本}")
-            # 注意：这里需要在GUI层处理弹框，因为models.py不能直接访问tkinter
-            # 所以我们返回安排信息，让GUI层处理
-            return 安排信息文本
-        return None
     
     def update(self):
         if self.game_state != "running":
