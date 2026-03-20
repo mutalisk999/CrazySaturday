@@ -22,10 +22,8 @@ class CrazySaturdayApp:
             ('郑三十五', 2), ('王三十六', 3)
         ]
         
-        # 默认装载示例选手
+        # 默认不装载示例选手，保持空列表
         self.game = Game()
-        for name, lives in self.example_players:
-            self.game.add_player(name, lives)
         
         # 设置减桌回调函数
         self.game.set_table_reduction_callback(self.show_table_reduction_dialog)
@@ -41,6 +39,14 @@ class CrazySaturdayApp:
         title_label = tk.Label(self.root, text="疯狂星期六抢1大赛 - 选手设置", 
                               font=('Arial', 16, 'bold'))
         title_label.pack(pady=10)
+        
+        # 测试模式复选框
+        self.test_mode_var = tk.BooleanVar(value=False)
+        test_mode_check = tk.Checkbutton(self.root, text="测试模式", 
+                                        variable=self.test_mode_var,
+                                        command=self.on_test_mode_change,
+                                        font=('Arial', 12))
+        test_mode_check.pack(pady=5)
         
         # 选手列表 - 使用表格显示
         players_label = tk.Label(self.root, text="选手列表:", font=('Arial', 12, 'bold'))
@@ -909,6 +915,52 @@ class CrazySaturdayApp:
         self.game.delete_future_states()
         messagebox.showinfo("状态确认", "已进入当前状态，之后的状态已删除！")
         self.create_game_screen()
+    
+    def on_test_mode_change(self):
+        """测试模式复选框变化事件处理"""
+        if self.test_mode_var.get():
+            # 清空现有选手
+            self.game.players = []
+            # 添加测试选手
+            for name, lives in self.example_players:
+                self.game.add_player(name, lives)
+        else:
+            # 清空选手列表
+            self.game.players = []
+        
+        # 只更新表格内容，不重新创建整个界面
+        self.update_players_table()
+    
+    def update_players_table(self):
+        """更新选手表格内容"""
+        # 清空表格
+        for item in self.players_table.get_children():
+            self.players_table.delete(item)
+        
+        # 填充表格数据 - HP值用红色小点显示
+        for i, player in enumerate(self.game.players):
+            # 将HP值转换为红色小点 - 使用更紧凑的显示
+            dots = '●' * player.initial_lives
+            self.players_table.insert('', 'end', values=(i+1, player.name, dots))
+        
+        # 更新开始比赛按钮
+        # 先找到并删除旧的按钮/警告标签
+        for widget in self.root.winfo_children():
+            if isinstance(widget, tk.Button) and widget.cget('text') == "开始比赛":
+                widget.destroy()
+            elif isinstance(widget, tk.Label) and "至少需要2名选手" in widget.cget('text'):
+                widget.destroy()
+        
+        # 添加新的开始比赛按钮或警告
+        if len(self.game.players) >= 2:
+            start_button = tk.Button(self.root, text="开始比赛", 
+                                   command=self.start_game,
+                                   bg='green', fg='white', font=('Arial', 12, 'bold'))
+            start_button.pack(pady=20)
+        else:
+            warning_label = tk.Label(self.root, text="至少需要2名选手才能开始比赛", 
+                                    fg='red')
+            warning_label.pack(pady=20)
     
     def restart_game(self):
         # 重新开始游戏
