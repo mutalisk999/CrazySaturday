@@ -287,7 +287,7 @@ class Game:
         print(f"球台 {table.table_id} 已立即关闭")
     
     def process_closing_table_after_elimination(self, table):
-        """处理被标记为需要关闭的球台在本局离场后的逻辑"""
+        """处理被标记为需要关闭的球台在判负离场后的逻辑"""
         if table.table_id not in self.tables_to_close:
             return
             
@@ -499,7 +499,7 @@ class Game:
             player.current_lives = 0
             self.move_to_eliminated(player, table_id)
         else:
-            # HP大于0，移动到候补区尾部（本局离场）
+            # HP大于0，移动到候补区尾部（判负离场）
             self.move_to_waiting(player, table_id)
         
         # 检查是否需要减桌（在调整球台位置之前）
@@ -516,7 +516,7 @@ class Game:
         if table.table_id in self.tables_to_close:
             self.process_closing_table_after_elimination(table)
         
-        # 本局离场后，尽可能安排场外候补选手上桌
+        # 判负离场后，尽可能安排场外候补选手上桌
         self.fill_leftover_tables()
         
         return True
@@ -597,7 +597,7 @@ class Game:
         # 从当前位置移除选手
         self.remove_player_from_current_position(player, table_id)
         
-        # 移动到场外候补区尾部（本局离场）
+        # 移动到场外候补区尾部（判负离场）
         self.outside_waiting.append(player)
         player.position = "场外候补"
         player.table_id = None

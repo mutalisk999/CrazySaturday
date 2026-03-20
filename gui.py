@@ -89,7 +89,7 @@ class CrazySaturdayApp:
         style.configure("Custom.Treeview.Heading", 
                        background="lightgray",
                        foreground="black",
-                       font=('Arial', 10, 'bold'))
+                       font=('Microsoft YaHei', 11, 'bold'))
         
         # 配置选中状态
         style.map("Custom.Treeview", 
@@ -287,28 +287,28 @@ class CrazySaturdayApp:
                 else:
                     host_color = 'black'
                 
-                # 擂主区域 - 包含本局离场按钮和选手信息
+                # 擂主区域 - 包含判负离场按钮和选手信息
                 host_frame = tk.Frame(table_frame)
                 host_frame.pack(fill='x', padx=10)
                 
-                # 擂主本局离场按钮
+                # 擂主判负离场按钮
                 if table.host:
-                    host_button = tk.Button(host_frame, text="本局离场", width=8, bg='yellow',
+                    host_button = tk.Button(host_frame, text="负", width=3, fg='blue', bg='yellow',
                                           command=lambda p=table.host, tid=table.table_id: 
                                           self.eliminate_player(p, tid, "擂主"))
                     host_button.pack(side='left', padx=(0, 5))
                 
                 # 擂主信息标签
-                host_label = tk.Label(host_frame, text=host_text, fg=host_color, anchor='w')
+                host_label = tk.Label(host_frame, text=host_text, fg=host_color, anchor='w', font=('Microsoft YaHei', 11, 'bold'))
                 host_label.pack(side='left', fill='x', expand=True)
                 
-                # 挑战者区域 - 包含本局离场按钮和选手信息
+                # 挑战者区域 - 包含判负离场按钮和选手信息
                 challenger_frame = tk.Frame(table_frame)
                 challenger_frame.pack(fill='x', padx=10)
                 
-                # 挑战者本局离场按钮
+                # 挑战者判负离场按钮
                 if table.challenger:
-                    challenger_button = tk.Button(challenger_frame, text="本局离场", width=8, bg='yellow',
+                    challenger_button = tk.Button(challenger_frame, text="负", width=3, fg='blue', bg='yellow',
                                                  command=lambda p=table.challenger, tid=table.table_id: 
                                                  self.eliminate_player(p, tid, "挑战者"))
                     challenger_button.pack(side='left', padx=(0, 5))
@@ -321,7 +321,7 @@ class CrazySaturdayApp:
                 else:
                     challenger_color = 'black'
                 
-                challenger_label = tk.Label(challenger_frame, text=challenger_text, fg=challenger_color, anchor='w')
+                challenger_label = tk.Label(challenger_frame, text=challenger_text, fg=challenger_color, anchor='w', font=('Microsoft YaHei', 11, 'bold'))
                 challenger_label.pack(side='left', fill='x', expand=True)
                 
                 # 候补 - 显示详细信息（候补选手不能被淘汰）
@@ -329,12 +329,12 @@ class CrazySaturdayApp:
                 waiting_frame.pack(fill='x', padx=10)
                 
                 # 候补区域占位按钮（保持对齐）
-                placeholder_button = tk.Button(waiting_frame, text="", width=8, state='disabled')
+                placeholder_button = tk.Button(waiting_frame, text=" ", width=3, state='disabled', bg='yellow')
                 placeholder_button.pack(side='left', padx=(0, 5))
                 
                 if table.waiting:
                     # 显示候补选手姓名和HP值
-                    waiting_label = tk.Label(waiting_frame, text="候补:", anchor='w')
+                    waiting_label = tk.Label(waiting_frame, text="候补:", anchor='w', font=('Microsoft YaHei', 11, 'bold'))
                     waiting_label.pack(side='left')
                     
                     for i, player in enumerate(table.waiting):
@@ -342,7 +342,7 @@ class CrazySaturdayApp:
                         if i > 0:
                             player_text = "，" + player_text
                         
-                        player_label = tk.Label(waiting_frame, text=player_text, anchor='w')
+                        player_label = tk.Label(waiting_frame, text=player_text, anchor='w', font=('Microsoft YaHei', 11, 'bold'))
                         player_label.pack(side='left')
                         
                         # 候补选手不能被下场，不绑定右键菜单
@@ -364,7 +364,7 @@ class CrazySaturdayApp:
         waiting_frame = ttk.Frame(notebook)
         notebook.add(waiting_frame, text="场外候补区")
         
-        waiting_text = scrolledtext.ScrolledText(waiting_frame, width=28, height=10)
+        waiting_text = scrolledtext.ScrolledText(waiting_frame, width=28, height=10, font=('Microsoft YaHei', 11, 'bold'))
         waiting_text.pack(fill='both', expand=True, padx=5, pady=5)
         
         # 插入场外候补选手，HP为1的显示为红色
@@ -384,7 +384,7 @@ class CrazySaturdayApp:
         eliminated_frame = ttk.Frame(notebook)
         notebook.add(eliminated_frame, text="已淘汰选手区")
         
-        eliminated_text = scrolledtext.ScrolledText(eliminated_frame, width=28, height=10)
+        eliminated_text = scrolledtext.ScrolledText(eliminated_frame, width=28, height=10, font=('Microsoft YaHei', 11, 'bold'))
         eliminated_text.pack(fill='both', expand=True, padx=5, pady=5)
         
         eliminated_players = [p.name for p in self.game.eliminated]
@@ -792,37 +792,37 @@ class CrazySaturdayApp:
         if self.game.start_game():
             self.create_game_screen()
     
-    # 右键菜单功能已删除，改用本局离场按钮
+    # 右键菜单功能已删除，改用判负离场按钮
     
     def eliminate_player(self, player, table_id, position):
-        """选手本局离场"""
+        """选手判负离场"""
         print(f"DEBUG: eliminate_player 被调用 - 选手: {player.name}, 球台: {table_id}, 位置: {position}")
         
         # 确认对话框
         confirm = messagebox.askyesno(
-            "确认本局离场", 
-            f"确定要让 {table_id} 号台的 {player.name} 本局离场吗？\n\n当前HP: {player.current_lives}/{player.initial_lives}"
+            "确认判负离场", 
+            f"确定要让 {table_id} 号台的 {player.name} 判负离场吗？\n\n当前HP: {player.current_lives}/{player.initial_lives}"
         )
         
         if not confirm:
-            print("DEBUG: 用户取消了本局离场操作")
+            print("DEBUG: 用户取消了判负离场操作")
             return
         
-        print("DEBUG: 用户确认了本局离场操作")
+        print("DEBUG: 用户确认了判负离场操作")
         
         # 执行离场逻辑
         success = self.game.eliminate_player(player, table_id)
         
         if success:
-            print("DEBUG: 本局离场逻辑执行成功")
+            print("DEBUG: 判负离场逻辑执行成功")
             # 离场后立即触发上场逻辑（安排场外候补选手上桌）
             self.game.fill_leftover_tables()
             # 刷新界面
             self.create_game_screen()
-            messagebox.showinfo("离场成功", f"选手 {player.name} 已本局离场")
+            messagebox.showinfo("离场成功", f"选手 {player.name} 已判负离场")
         else:
-            print("DEBUG: 本局离场逻辑执行失败")
-            messagebox.showerror("离场失败", "本局离场操作失败，请重试")
+            print("DEBUG: 判负离场逻辑执行失败")
+            messagebox.showerror("离场失败", "判负离场操作失败，请重试")
     
     def show_table_reduction_dialog(self, table_id, players_info):
         """显示减桌对话框"""
