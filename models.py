@@ -83,6 +83,11 @@ class Game:
         
         # 已离场桌台队列（用于重新安排选手）
         self.leftover_tables_queue = []  # 已离场的桌台号队列
+        
+        # 状态机相关属性
+        self.state_history = []  # 状态历史记录
+        self.current_state_index = -1  # 当前状态索引
+        self.max_states = 100  # 最大状态记录数量
     
     def calculate_required_tables(self, player_count: int) -> int:
         """根据选手数量计算需要的球台数量"""
@@ -165,6 +170,10 @@ class Game:
                 player.position = "场外候补"
         
         self.game_state = "running"
+        
+        # 保存初始状态
+        self.save_state("初始状态")
+        
         return True
     
     def get_active_tables_count(self):
@@ -399,6 +408,9 @@ class Game:
         # 位置轮转
         self.rotate_positions(table, winner, loser, loser_lost_life)
         
+        # 保存比赛后的状态
+        self.save_state(f"{table.table_id}号台比赛: {winner.name} 胜 {loser.name}")
+        
         return winner, loser
     
     def rotate_positions(self, table: Table, winner: Player, loser: Player, loser_lost_life: bool):
@@ -518,6 +530,9 @@ class Game:
         
         # 判负离场后，尽可能安排场外候补选手上桌
         self.fill_leftover_tables()
+        
+        # 保存判负离场后的状态
+        self.save_state(f"{table_id}号台: {player.name} 判负离场")
         
         return True
     
@@ -769,3 +784,170 @@ class Game:
         
         # 处理已离场桌台队列，安排场外候补选手上桌
         self.fill_leftover_tables()
+    
+    def save_state(self, description=""):
+        """保存当前游戏状态到历史记录"""
+        if self.game_state != "running":
+            return
+        
+        # 创建状态快照
+        state = {
+            "description": description,
+            "timestamp": len(self.state_history) + 1,
+            "players": self._deep_copy_players(),
+            "tables": self._deep_copy_tables(),
+            "outside_waiting": self._deep_copy_player_list(self.outside_waiting),
+            "eliminated": self._deep_copy_player_list(self.eliminated),
+            "game_state": self.game_state,
+            "winner": self.winner.name if self.winner else None,
+            "tables_to_close": self.tables_to_close.copy(),
+            "closing_tables": self.closing_tables.copy(),
+            "leftover_tables_queue": self.leftover_tables_queue.copy()
+        }
+        
+        # 如果当前不是在最新状态，删除之后的所有状态
+        if self.current_state_index < len(self.state_history) - 1:
+            self.state_history = self.state_history[:self.current_state_index + 1]
+        
+        # 添加新状态
+        self.state_history.append(state)
+        self.current_state_index = len(self.state_history) - 1
+        
+        # 限制状态数量
+        if len(self.state_history) > self.max_states:
+            self.state_history.pop(0)
+            self.current_state_index = min(self.current_state_index, len(self.state_history) - 1)
+    
+    def restore_state(self, state_index):
+        """恢复到指定状态"""
+        if state_index < 0 or state_index >= len(self.state_history):
+            return False
+        
+        state = self.state_history[state_index]
+        
+        # 恢复选手
+        self.players = self._deep_copy_players_from_dict(state["players"])
+        
+        # 恢复球台
+        self.tables = self._deep_copy_tables_from_dict(state["tables"])
+        
+        # 恢复场外候补和已淘汰
+        self.outside_waiting = self._find_players_by_names(state["outside_waiting"])
+        self.eliminated = self._find_players_by_names(state["eliminated"])
+        
+        # 恢复其他状态
+        self.game_state = state["game_state"]
+        self.winner = self._find_player_by_name(state["winner"]) if state["winner"] else None
+        self.tables_to_close = state["tables_to_close"].copy()
+        self.closing_tables = state["closing_tables"].copy()
+        self.leftover_tables_queue = state["leftover_tables_queue"].copy()
+        
+        self.current_state_index = state_index
+        return True
+    
+    def delete_future_states(self):
+        """删除当前状态之后的所有状态"""
+        if self.current_state_index < len(self.state_history) - 1:
+            self.state_history = self.state_history[:self.current_state_index + 1]
+    
+    def get_state_count(self):
+        """获取状态历史数量"""
+        return len(self.state_history)
+    
+    def get_current_state_index(self):
+        """获取当前状态索引"""
+        return self.current_state_index
+    
+    def get_state_description(self, state_index):
+        """获取指定状态的描述"""
+        if state_index < 0 or state_index >= len(self.state_history):
+            return ""
+        return self.state_history[state_index]["description"]
+    
+    def _deep_copy_players(self):
+        """深拷贝选手列表"""
+        return {p.name: {
+            "name": p.name,
+            "initial_lives": p.initial_lives,
+            "current_lives": p.current_lives,
+            "position": p.position,
+            "table_id": p.table_id,
+            "wins": p.wins,
+            "losses": p.losses,
+            "streak": p.streak,
+            "max_streak": p.max_streak
+        } for p in self.players}
+    
+    def _deep_copy_tables(self):
+        """深拷贝球台列表"""
+        return {t.table_id: {
+            "table_id": t.table_id,
+            "host": t.host.name if t.host else None,
+            "challenger": t.challenger.name if t.challenger else None,
+            "waiting": [p.name for p in t.waiting],
+            "active": t.active
+        } for t in self.tables}
+    
+    def _deep_copy_player_list(self, player_list):
+        """深拷贝选手名称列表"""
+        return [p.name for p in player_list]
+    
+    def _deep_copy_players_from_dict(self, players_dict):
+        """从字典恢复选手列表"""
+        players = []
+        for name, data in players_dict.items():
+            p = Player(data["name"], data["initial_lives"])
+            p.current_lives = data["current_lives"]
+            p.position = data["position"]
+            p.table_id = data["table_id"]
+            p.wins = data["wins"]
+            p.losses = data["losses"]
+            p.streak = data["streak"]
+            p.max_streak = data["max_streak"]
+            players.append(p)
+        return players
+    
+    def _deep_copy_tables_from_dict(self, tables_dict):
+        """从字典恢复球台列表"""
+        tables = []
+        # 按照table_id排序
+        sorted_table_ids = sorted(tables_dict.keys())
+        for table_id in sorted_table_ids:
+            data = tables_dict[table_id]
+            t = Table(data["table_id"])
+            t.active = data["active"]
+            # 先设置擂主、挑战者和候补者，但需要等选手列表恢复后再关联
+            # 这里只保存名称，后面通过_find_player_by_name关联
+            t._host_name = data["host"]
+            t._challenger_name = data["challenger"]
+            t._waiting_names = data["waiting"]
+            tables.append(t)
+        
+        # 关联选手到球台
+        for t in tables:
+            if hasattr(t, "_host_name") and t._host_name:
+                t.host = self._find_player_by_name(t._host_name)
+            if hasattr(t, "_challenger_name") and t._challenger_name:
+                t.challenger = self._find_player_by_name(t._challenger_name)
+            if hasattr(t, "_waiting_names") and t._waiting_names:
+                t.waiting = [self._find_player_by_name(name) for name in t._waiting_names if self._find_player_by_name(name)]
+        
+        return tables
+    
+    def _find_player_by_name(self, name):
+        """通过名称查找选手"""
+        if not name:
+            return None
+        for p in self.players:
+            if p.name == name:
+                return p
+        return None
+    
+    def _find_players_by_names(self, names):
+        """通过名称列表查找选手"""
+        players = []
+        for name in names:
+            p = self._find_player_by_name(name)
+            if p:
+                players.append(p)
+        return players

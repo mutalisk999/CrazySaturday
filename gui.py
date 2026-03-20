@@ -255,7 +255,14 @@ class CrazySaturdayApp:
         tables_per_row = 3  # 每行显示3个球台
         table_count = 0
         
-        for table in self.game.tables:
+        # 按照table_priority顺序排序球台
+        table_priority = self.game.table_priority
+        # 创建一个字典，将table_id映射到优先级索引
+        table_id_to_priority = {table_id: i for i, table_id in enumerate(table_priority)}
+        # 按照优先级排序球台
+        sorted_tables = sorted(self.game.tables, key=lambda t: table_id_to_priority.get(t.table_id, 999))
+        
+        for table in sorted_tables:
             if table.active:
                 # 检查球台是否被标记为需要关闭
                 is_closing_table = table.table_id in self.game.tables_to_close
@@ -401,6 +408,46 @@ class CrazySaturdayApp:
                               text=f"剩余选手: {self.game.get_remaining_players_count()}",
                               font=('Arial', 12))
         status_label.pack(side='left', padx=20)
+        
+        # 状态机控制区域
+        state_frame = tk.Frame(bottom_frame)
+        state_frame.pack(side='right', padx=20)
+        
+        # 状态数量
+        state_count = self.game.get_state_count()
+        current_index = self.game.get_current_state_index()
+        
+        if state_count > 0:
+            # 状态索引显示
+            index_label = tk.Label(state_frame, 
+                                 text=f"状态: {current_index}/{state_count - 1}",
+                                 font=('Arial', 10, 'bold'))
+            index_label.pack(side='left', padx=5)
+            
+            # 向左按钮
+            prev_button = tk.Button(state_frame, text="◀", 
+                                  command=self.prev_state,
+                                  state='disabled' if current_index <= 0 else 'normal',
+                                  font=('Arial', 12, 'bold'), width=3)
+            prev_button.pack(side='left', padx=2)
+            
+            # 向右按钮
+            next_button = tk.Button(state_frame, text="▶", 
+                                  command=self.next_state,
+                                  state='disabled' if current_index >= state_count - 1 else 'normal',
+                                  font=('Arial', 12, 'bold'), width=3)
+            next_button.pack(side='left', padx=2)
+            
+            # 当前状态描述
+            state_desc = self.game.get_state_description(current_index)
+            state_label = tk.Label(state_frame, text=state_desc, font=('Arial', 10))
+            state_label.pack(side='left', padx=5)
+            
+            # 进入状态按钮
+            enter_state_button = tk.Button(state_frame, text="进入状态", 
+                                         command=self.enter_current_state,
+                                         bg='blue', fg='white', font=('Arial', 10, 'bold'))
+            enter_state_button.pack(side='left', padx=5)
     
     def create_finished_screen(self):
         # 清除现有界面
@@ -841,6 +888,27 @@ class CrazySaturdayApp:
             self.create_game_screen()
         else:
             self.create_finished_screen()
+    
+    def prev_state(self):
+        """回退到上一个状态"""
+        current_index = self.game.get_current_state_index()
+        if current_index > 0:
+            self.game.restore_state(current_index - 1)
+            self.create_game_screen()
+    
+    def next_state(self):
+        """前进到下一个状态"""
+        current_index = self.game.get_current_state_index()
+        state_count = self.game.get_state_count()
+        if current_index < state_count - 1:
+            self.game.restore_state(current_index + 1)
+            self.create_game_screen()
+    
+    def enter_current_state(self):
+        """进入当前状态 - 删除之后的所有状态"""
+        self.game.delete_future_states()
+        messagebox.showinfo("状态确认", "已进入当前状态，之后的状态已删除！")
+        self.create_game_screen()
     
     def restart_game(self):
         # 重新开始游戏
