@@ -22,6 +22,9 @@ class CrazySaturdayApp:
             ('郑三十五', 2), ('王三十六', 3)
         ]
         
+        # 测试模式变量
+        self.test_mode_var = tk.BooleanVar(value=False)
+        
         # 默认不装载示例选手，保持空列表
         self.game = Game()
         
@@ -40,8 +43,7 @@ class CrazySaturdayApp:
                               font=('Arial', 16, 'bold'))
         title_label.pack(pady=10)
         
-        # 测试模式复选框
-        self.test_mode_var = tk.BooleanVar(value=False)
+        # 测试模式复选框 - 使用已有的变量
         test_mode_check = tk.Checkbutton(self.root, text="测试模式", 
                                         variable=self.test_mode_var,
                                         command=self.on_test_mode_change,
@@ -211,16 +213,26 @@ class CrazySaturdayApp:
         add_button = tk.Button(add_frame, text="添加选手", command=self.add_player)
         add_button.pack(side='left', padx=10)
         
-        # 开始比赛按钮
+        # 按钮区域
+        button_frame = tk.Frame(self.root)
+        button_frame.pack(pady=20)
+        
+        # 加载历史状态按钮
+        load_button = tk.Button(button_frame, text="加载历史状态", 
+                               command=self.load_history_state,
+                               bg='blue', fg='white', font=('Arial', 12, 'bold'))
+        load_button.pack(side='left', padx=10)
+        
+        # 重新开始比赛按钮
         if len(self.game.players) >= 2:
-            start_button = tk.Button(self.root, text="开始比赛", 
-                                   command=self.start_game,
+            start_button = tk.Button(button_frame, text="重新开始比赛", 
+                                   command=self.restart_game,
                                    bg='green', fg='white', font=('Arial', 12, 'bold'))
-            start_button.pack(pady=20)
+            start_button.pack(side='left', padx=10)
         else:
-            warning_label = tk.Label(self.root, text="至少需要2名选手才能开始比赛", 
+            warning_label = tk.Label(button_frame, text="至少需要2名选手才能开始比赛", 
                                     fg='red')
-            warning_label.pack(pady=20)
+            warning_label.pack(side='left')
     
     def create_game_screen(self):
         # 清除现有界面
@@ -845,6 +857,15 @@ class CrazySaturdayApp:
         if self.game.start_game():
             self.create_game_screen()
     
+    def load_history_state(self):
+        """加载历史状态"""
+        if self.game.load_states_from_file():
+            # 状态加载成功，跳转到游戏界面
+            self.create_game_screen()
+        else:
+            # 状态加载失败
+            messagebox.showinfo("提示", "没有找到历史状态文件，无法加载历史状态")
+    
     # 右键菜单功能已删除，改用判负离场按钮
     
     def eliminate_player(self, player, table_id, position):
@@ -913,6 +934,8 @@ class CrazySaturdayApp:
     def enter_current_state(self):
         """进入当前状态 - 删除之后的所有状态"""
         self.game.delete_future_states()
+        # 保存状态到文件
+        self.game.save_states_to_file()
         messagebox.showinfo("状态确认", "已进入当前状态，之后的状态已删除！")
         self.create_game_screen()
     
@@ -928,8 +951,8 @@ class CrazySaturdayApp:
             # 清空选手列表
             self.game.players = []
         
-        # 只更新表格内容，不重新创建整个界面
-        self.update_players_table()
+        # 重新创建整个界面
+        self.create_setup_screen()
     
     def update_players_table(self):
         """更新选手表格内容"""
@@ -942,27 +965,17 @@ class CrazySaturdayApp:
             # 将HP值转换为红色小点 - 使用更紧凑的显示
             dots = '●' * player.initial_lives
             self.players_table.insert('', 'end', values=(i+1, player.name, dots))
-        
-        # 更新开始比赛按钮
-        # 先找到并删除旧的按钮/警告标签
-        for widget in self.root.winfo_children():
-            if isinstance(widget, tk.Button) and widget.cget('text') == "开始比赛":
-                widget.destroy()
-            elif isinstance(widget, tk.Label) and "至少需要2名选手" in widget.cget('text'):
-                widget.destroy()
-        
-        # 添加新的开始比赛按钮或警告
-        if len(self.game.players) >= 2:
-            start_button = tk.Button(self.root, text="开始比赛", 
-                                   command=self.start_game,
-                                   bg='green', fg='white', font=('Arial', 12, 'bold'))
-            start_button.pack(pady=20)
-        else:
-            warning_label = tk.Label(self.root, text="至少需要2名选手才能开始比赛", 
-                                    fg='red')
-            warning_label.pack(pady=20)
     
     def restart_game(self):
+        import os
+        import json
+        
+        # 删除历史状态文件
+        state_file = "game_states.json"
+        if os.path.exists(state_file):
+            os.remove(state_file)
+            print(f"已删除状态文件: {state_file}")
+        
         # 重新开始游戏
         self.game = Game()
         
@@ -970,7 +983,11 @@ class CrazySaturdayApp:
         for name, lives in self.example_players:
             self.game.add_player(name, lives)
         
-        self.create_setup_screen()
+        # 开始新比赛并进入第二页
+        if self.game.start_game():
+            # 创建一个空的状态文件
+            self.game.save_states_to_file()
+            self.create_game_screen()
     
     def run(self):
         self.root.mainloop()

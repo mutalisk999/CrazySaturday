@@ -817,6 +817,9 @@ class Game:
         if len(self.state_history) > self.max_states:
             self.state_history.pop(0)
             self.current_state_index = min(self.current_state_index, len(self.state_history) - 1)
+        
+        # 自动保存状态到文件
+        self.save_states_to_file()
     
     def restore_state(self, state_index):
         """恢复到指定状态"""
@@ -951,3 +954,62 @@ class Game:
             if p:
                 players.append(p)
         return players
+    
+    def save_states_to_file(self, filename="game_states.json"):
+        """将状态历史保存到JSON文件"""
+        import json
+        
+        # 准备要保存的数据
+        states_data = []
+        for state in self.state_history:
+            state_data = {
+                "description": state["description"],
+                "timestamp": state["timestamp"],
+                "players": state["players"],
+                "tables": state["tables"],
+                "outside_waiting": state["outside_waiting"],
+                "eliminated": state["eliminated"],
+                "game_state": state["game_state"],
+                "winner": state["winner"],
+                "tables_to_close": state["tables_to_close"],
+                "closing_tables": state["closing_tables"],
+                "leftover_tables_queue": state["leftover_tables_queue"]
+            }
+            states_data.append(state_data)
+        
+        # 保存到JSON文件
+        with open(filename, 'w', encoding='utf-8') as f:
+            json.dump({
+                "state_history": states_data,
+                "current_state_index": self.current_state_index,
+                "max_states": self.max_states
+            }, f, ensure_ascii=False, indent=2)
+    
+    def load_states_from_file(self, filename="game_states.json"):
+        """从JSON文件加载状态历史"""
+        import os
+        import json
+        
+        if not os.path.exists(filename):
+            return False
+        
+        try:
+            with open(filename, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            
+            self.state_history = data.get("state_history", [])
+            saved_current_index = data.get("current_state_index", -1)
+            self.max_states = data.get("max_states", 100)
+            
+            # 恢复状态到当前索引对应的状态
+            if saved_current_index >= 0 and saved_current_index < len(self.state_history):
+                self.restore_state(saved_current_index)
+            else:
+                # 如果索引无效，恢复到最后一个状态
+                if len(self.state_history) > 0:
+                    self.restore_state(len(self.state_history) - 1)
+            
+            return True
+        except Exception as e:
+            print(f"加载状态文件失败: {e}")
+            return False
