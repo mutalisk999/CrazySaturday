@@ -291,8 +291,8 @@ class CrazySaturdayApp:
                 host_frame = tk.Frame(table_frame)
                 host_frame.pack(fill='x', padx=10)
                 
-                # 擂主判负离场按钮
-                if table.host:
+                # 擂主判负离场按钮 - 只有当擂主和挑战者都存在时才显示
+                if table.host and table.challenger:
                     host_button = tk.Button(host_frame, text="负", width=3, fg='blue', bg='yellow',
                                           command=lambda p=table.host, tid=table.table_id: 
                                           self.eliminate_player(p, tid, "擂主"))
@@ -306,8 +306,8 @@ class CrazySaturdayApp:
                 challenger_frame = tk.Frame(table_frame)
                 challenger_frame.pack(fill='x', padx=10)
                 
-                # 挑战者判负离场按钮
-                if table.challenger:
+                # 挑战者判负离场按钮 - 只有当擂主和挑战者都存在时才显示
+                if table.host and table.challenger:
                     challenger_button = tk.Button(challenger_frame, text="负", width=3, fg='blue', bg='yellow',
                                                  command=lambda p=table.challenger, tid=table.table_id: 
                                                  self.eliminate_player(p, tid, "挑战者"))
