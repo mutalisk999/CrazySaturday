@@ -516,6 +516,9 @@ class Game:
         if table.table_id in self.tables_to_close:
             self.process_closing_table_after_elimination(table)
         
+        # 本局离场后，尽可能安排场外候补选手上桌
+        self.fill_leftover_tables()
+        
         return True
     
     def adjust_table_positions_after_host_elimination(self, table):
@@ -627,7 +630,8 @@ class Game:
             self.outside_waiting.remove(player)
     
     def fill_leftover_tables(self):
-        """从已离场桌台队列头部开始安排场外候补选手上桌"""
+        """从已离场桌台队列头部开始安排场外候补选手上桌，尽可能多地安排所有场外候补选手"""
+        # 首先处理已离场桌台队列
         while self.leftover_tables_queue and self.outside_waiting:
             # 获取队列头部的桌台号
             table_id = self.leftover_tables_queue[0]
@@ -702,6 +706,46 @@ class Game:
                     # 桌台已满员，从队列中移除
                     self.leftover_tables_queue.pop(0)
                 # 如果没有满员安排（部分安排），保留这个桌号，等待下次安排
+        
+        # 然后处理所有活跃的球台，尽可能安排场外候补选手
+        # 这是为了确保所有场外候补选手都能被安排上桌
+        if self.outside_waiting:
+            for table in self.tables:
+                if not table.active:
+                    continue
+                
+                # 如果桌台被标记为需要关闭，跳过
+                if table.table_id in self.tables_to_close or table.table_id in self.closing_tables:
+                    continue
+                
+                # 检查桌台的空位情况
+                host_needed = table.host is None
+                challenger_needed = table.challenger is None
+                waiting_needed = len(table.waiting) < 1  # 最多1个候补
+                
+                # 如果桌台已满员，跳过
+                if not host_needed and not challenger_needed and not waiting_needed:
+                    continue
+                
+                # 安排场外候补选手上桌（尽可能多地安排）
+                # 优先级：擂主 > 挑战者 > 候补
+                if host_needed and self.outside_waiting:
+                    player = self.outside_waiting.pop(0)
+                    table.host = player
+                    player.position = f"{table.table_id}号台擂主"
+                    player.table_id = table.table_id
+                
+                if challenger_needed and self.outside_waiting:
+                    player = self.outside_waiting.pop(0)
+                    table.challenger = player
+                    player.position = f"{table.table_id}号台挑战者"
+                    player.table_id = table.table_id
+                
+                if waiting_needed and self.outside_waiting:
+                    player = self.outside_waiting.pop(0)
+                    table.waiting.append(player)
+                    player.position = f"{table.table_id}号台候补"
+                    player.table_id = table.table_id
     
     def update(self):
         if self.game_state != "running":
