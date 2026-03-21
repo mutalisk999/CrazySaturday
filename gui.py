@@ -22,10 +22,11 @@ class CrazySaturdayApp:
             ('郑三十五', 2), ('王三十六', 3)
         ]
         
-        # 默认装载示例选手
+        # 测试模式变量
+        self.test_mode_var = tk.BooleanVar(value=False)
+        
+        # 默认不装载示例选手，保持空列表
         self.game = Game()
-        for name, lives in self.example_players:
-            self.game.add_player(name, lives)
         
         # 设置减桌回调函数
         self.game.set_table_reduction_callback(self.show_table_reduction_dialog)
@@ -41,6 +42,13 @@ class CrazySaturdayApp:
         title_label = tk.Label(self.root, text="疯狂星期六抢1大赛 - 选手设置", 
                               font=('Arial', 16, 'bold'))
         title_label.pack(pady=10)
+        
+        # 测试模式复选框 - 使用已有的变量
+        test_mode_check = tk.Checkbutton(self.root, text="测试模式", 
+                                        variable=self.test_mode_var,
+                                        command=self.on_test_mode_change,
+                                        font=('Arial', 12))
+        test_mode_check.pack(pady=5)
         
         # 选手列表 - 使用表格显示
         players_label = tk.Label(self.root, text="选手列表:", font=('Arial', 12, 'bold'))
@@ -205,16 +213,26 @@ class CrazySaturdayApp:
         add_button = tk.Button(add_frame, text="添加选手", command=self.add_player)
         add_button.pack(side='left', padx=10)
         
-        # 开始比赛按钮
+        # 按钮区域
+        button_frame = tk.Frame(self.root)
+        button_frame.pack(pady=20)
+        
+        # 加载历史状态按钮
+        load_button = tk.Button(button_frame, text="加载历史状态", 
+                               command=self.load_history_state,
+                               bg='blue', fg='white', font=('Arial', 12, 'bold'))
+        load_button.pack(side='left', padx=10)
+        
+        # 重新开始比赛按钮
         if len(self.game.players) >= 2:
-            start_button = tk.Button(self.root, text="开始比赛", 
-                                   command=self.start_game,
+            start_button = tk.Button(button_frame, text="重新开始比赛", 
+                                   command=self.restart_game,
                                    bg='green', fg='white', font=('Arial', 12, 'bold'))
-            start_button.pack(pady=20)
+            start_button.pack(side='left', padx=10)
         else:
-            warning_label = tk.Label(self.root, text="至少需要2名选手才能开始比赛", 
+            warning_label = tk.Label(button_frame, text="至少需要2名选手才能开始比赛", 
                                     fg='red')
-            warning_label.pack(pady=20)
+            warning_label.pack(side='left')
     
     def create_game_screen(self):
         # 清除现有界面
@@ -286,14 +304,6 @@ class CrazySaturdayApp:
                 
                 table_count += 1
                 
-                # 擂主
-                host_text = f"擂主: {table.host.name if table.host else '无'}"
-                if table.host:
-                    host_text += f" ({table.host.current_lives}/{table.host.initial_lives})"
-                    host_color = 'red' if table.host.current_lives == 1 else 'black'
-                else:
-                    host_color = 'black'
-                
                 # 擂主区域 - 包含判负离场按钮和选手信息
                 host_frame = tk.Frame(table_frame)
                 host_frame.pack(fill='x', padx=10)
@@ -305,9 +315,19 @@ class CrazySaturdayApp:
                                           self.eliminate_player(p, tid, "擂主"))
                     host_button.pack(side='left', padx=(0, 5))
                 
-                # 擂主信息标签
-                host_label = tk.Label(host_frame, text=host_text, fg=host_color, anchor='w', font=('Microsoft YaHei', 11, 'bold'))
-                host_label.pack(side='left', fill='x', expand=True)
+                # 擂主信息标签 - 分为两个标签，只有选手名字变红
+                host_label_prefix = tk.Label(host_frame, text="擂主: ", anchor='w', font=('Microsoft YaHei', 11, 'bold'))
+                host_label_prefix.pack(side='left')
+                
+                if table.host:
+                    host_name_text = f"{table.host.name} ({table.host.current_lives}/{table.host.initial_lives})"
+                    host_name_color = 'red' if table.host.current_lives == 1 else 'black'
+                else:
+                    host_name_text = '无'
+                    host_name_color = 'black'
+                
+                host_label_name = tk.Label(host_frame, text=host_name_text, fg=host_name_color, anchor='w', font=('Microsoft YaHei', 11, 'bold'))
+                host_label_name.pack(side='left', fill='x', expand=True)
                 
                 # 挑战者区域 - 包含判负离场按钮和选手信息
                 challenger_frame = tk.Frame(table_frame)
@@ -320,16 +340,19 @@ class CrazySaturdayApp:
                                                  self.eliminate_player(p, tid, "挑战者"))
                     challenger_button.pack(side='left', padx=(0, 5))
                 
-                # 挑战者信息标签
-                challenger_text = f"挑战者: {table.challenger.name if table.challenger else '无'}"
-                if table.challenger:
-                    challenger_text += f" ({table.challenger.current_lives}/{table.challenger.initial_lives})"
-                    challenger_color = 'red' if table.challenger.current_lives == 1 else 'black'
-                else:
-                    challenger_color = 'black'
+                # 挑战者信息标签 - 分为两个标签，只有选手名字变红
+                challenger_label_prefix = tk.Label(challenger_frame, text="挑战者: ", anchor='w', font=('Microsoft YaHei', 11, 'bold'))
+                challenger_label_prefix.pack(side='left')
                 
-                challenger_label = tk.Label(challenger_frame, text=challenger_text, fg=challenger_color, anchor='w', font=('Microsoft YaHei', 11, 'bold'))
-                challenger_label.pack(side='left', fill='x', expand=True)
+                if table.challenger:
+                    challenger_name_text = f"{table.challenger.name} ({table.challenger.current_lives}/{table.challenger.initial_lives})"
+                    challenger_name_color = 'red' if table.challenger.current_lives == 1 else 'black'
+                else:
+                    challenger_name_text = '无'
+                    challenger_name_color = 'black'
+                
+                challenger_label_name = tk.Label(challenger_frame, text=challenger_name_text, fg=challenger_name_color, anchor='w', font=('Microsoft YaHei', 11, 'bold'))
+                challenger_label_name.pack(side='left', fill='x', expand=True)
                 
                 # 候补 - 显示详细信息（候补选手不能被淘汰）
                 waiting_frame = tk.Frame(table_frame)
@@ -349,7 +372,11 @@ class CrazySaturdayApp:
                         if i > 0:
                             player_text = "，" + player_text
                         
-                        player_label = tk.Label(waiting_frame, text=player_text, anchor='w', font=('Microsoft YaHei', 11, 'bold'))
+                        # HP为1的选手显示为红色
+                        if player.current_lives == 1:
+                            player_label = tk.Label(waiting_frame, text=player_text, anchor='w', font=('Microsoft YaHei', 11, 'bold'), fg='red')
+                        else:
+                            player_label = tk.Label(waiting_frame, text=player_text, anchor='w', font=('Microsoft YaHei', 11, 'bold'))
                         player_label.pack(side='left')
                         
                         # 候补选手不能被下场，不绑定右键菜单
@@ -839,6 +866,15 @@ class CrazySaturdayApp:
         if self.game.start_game():
             self.create_game_screen()
     
+    def load_history_state(self):
+        """加载历史状态"""
+        if self.game.load_states_from_file():
+            # 状态加载成功，跳转到游戏界面
+            self.create_game_screen()
+        else:
+            # 状态加载失败
+            messagebox.showinfo("提示", "没有找到历史状态文件，无法加载历史状态")
+    
     # 右键菜单功能已删除，改用判负离场按钮
     
     def eliminate_player(self, player, table_id, position):
@@ -907,18 +943,68 @@ class CrazySaturdayApp:
     def enter_current_state(self):
         """进入当前状态 - 删除之后的所有状态"""
         self.game.delete_future_states()
+        # 保存状态到文件
+        self.game.save_states_to_file()
         messagebox.showinfo("状态确认", "已进入当前状态，之后的状态已删除！")
         self.create_game_screen()
     
+    def on_test_mode_change(self):
+        """测试模式复选框变化事件处理"""
+        if self.test_mode_var.get():
+            # 清空现有选手
+            self.game.players = []
+            # 添加测试选手
+            for name, lives in self.example_players:
+                self.game.add_player(name, lives)
+        else:
+            # 清空选手列表
+            self.game.players = []
+        
+        # 重新创建整个界面
+        self.create_setup_screen()
+    
+    def update_players_table(self):
+        """更新选手表格内容"""
+        # 清空表格
+        for item in self.players_table.get_children():
+            self.players_table.delete(item)
+        
+        # 填充表格数据 - HP值用红色小点显示
+        for i, player in enumerate(self.game.players):
+            # 将HP值转换为红色小点 - 使用更紧凑的显示
+            dots = '●' * player.initial_lives
+            self.players_table.insert('', 'end', values=(i+1, player.name, dots))
+    
     def restart_game(self):
+        import os
+        import json
+        
+        # 保存当前选手列表
+        current_players = [(p.name, p.initial_lives) for p in self.game.players]
+        
+        # 删除历史状态文件
+        state_file = "game_states.json"
+        if os.path.exists(state_file):
+            os.remove(state_file)
+            print(f"已删除状态文件: {state_file}")
+        
         # 重新开始游戏
         self.game = Game()
         
-        # 重新添加示例选手
-        for name, lives in self.example_players:
-            self.game.add_player(name, lives)
+        # 重新添加之前保存的选手
+        if current_players:
+            for name, lives in current_players:
+                self.game.add_player(name, lives)
+        else:
+            # 如果没有选手，添加示例选手
+            for name, lives in self.example_players:
+                self.game.add_player(name, lives)
         
-        self.create_setup_screen()
+        # 开始新比赛并进入第二页
+        if self.game.start_game():
+            # 创建一个空的状态文件
+            self.game.save_states_to_file()
+            self.create_game_screen()
     
     def run(self):
         self.root.mainloop()
