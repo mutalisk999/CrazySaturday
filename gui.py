@@ -1,13 +1,13 @@
 import tkinter as tk
 from tkinter import ttk, scrolledtext, messagebox
-from models import Game
+from models import Game, FixedParticipant, FixedParticipantManager
 
 class CrazySaturdayApp:
     def __init__(self):
         self.game = Game()
         self.root = tk.Tk()
         self.root.title("疯狂星期六抢1大赛")
-        self.root.geometry("1000x700")
+        self.root.geometry("1100x700")
         
         # 示例选手列表（用于重新开始游戏时使用）
         self.example_players = [
@@ -24,6 +24,9 @@ class CrazySaturdayApp:
         
         # 测试模式变量
         self.test_mode_var = tk.BooleanVar(value=False)
+        
+        # 固定参赛选手管理器
+        self.fixed_participant_manager = FixedParticipantManager()
         
         # 默认不装载示例选手，保持空列表
         self.game = Game()
@@ -191,8 +194,14 @@ class CrazySaturdayApp:
         add_frame.pack(fill='x', padx=20, pady=10)
         
         tk.Label(add_frame, text="添加新选手:").pack(side='left')
-        self.name_entry = tk.Entry(add_frame, width=15)
-        self.name_entry.pack(side='left', padx=5)
+        # 创建可输入的下拉框
+        self.name_var = tk.StringVar()
+        self.name_combobox = ttk.Combobox(add_frame, textvariable=self.name_var, width=15)
+        self.name_combobox.pack(side='left', padx=5)
+        # 填充固定参赛选手到下拉框
+        self.refresh_name_combobox()
+        # 绑定选择事件
+        self.name_combobox.bind('<<ComboboxSelected>>', self.on_name_selected)
         
         tk.Label(add_frame, text="初始HP:").pack(side='left')
         self.lives_var = tk.StringVar(value='4')
@@ -216,6 +225,12 @@ class CrazySaturdayApp:
         # 按钮区域
         button_frame = tk.Frame(self.root)
         button_frame.pack(pady=20)
+        
+        # 固定参赛选手按钮
+        fixed_button = tk.Button(button_frame, text="固定参赛选手", 
+                               command=self.create_fixed_participants_screen,
+                               bg='orange', fg='white', font=('Arial', 12, 'bold'))
+        fixed_button.pack(side='left', padx=10)
         
         # 加载历史状态按钮
         load_button = tk.Button(button_frame, text="加载历史状态", 
@@ -730,7 +745,7 @@ class CrazySaturdayApp:
         ok_button.pack(pady=10)
     
     def add_player(self):
-        name = self.name_entry.get().strip()
+        name = self.name_var.get().strip()
         lives = self.lives_var.get()
         
         if name and lives:
@@ -749,9 +764,6 @@ class CrazySaturdayApp:
                 
                 ok_button = tk.Button(error_window, text="确定", command=error_window.destroy)
                 ok_button.pack(pady=10)
-                
-                # 将焦点设置回姓名输入框
-                self.name_entry.focus_set()
                 return
             
             # 验证姓名首字符：只允许中文或大小写字母
@@ -772,15 +784,24 @@ class CrazySaturdayApp:
                 
                 ok_button = tk.Button(error_window, text="确定", command=error_window.destroy)
                 ok_button.pack(pady=10)
-                
-                # 将焦点设置回姓名输入框
-                self.name_entry.focus_set()
                 return
             
             # 添加选手
             if self.game.add_player(name, int(lives)):
-                self.name_entry.delete(0, 'end')
+                self.name_var.set("")
                 self.create_setup_screen()
+    
+    def refresh_name_combobox(self):
+        """刷新姓名下拉框的选项"""
+        if hasattr(self, 'name_combobox'):
+            self.name_combobox['values'] = self.fixed_participant_manager.get_all_names()
+    
+    def on_name_selected(self, event):
+        """选择固定参赛选手时自动填充HP"""
+        selected_name = self.name_var.get()
+        participant = self.fixed_participant_manager.get_participant(selected_name)
+        if participant:
+            self.lives_var.set(str(participant.initial_hp))
     
     def on_window_resize(self, event):
         """窗口大小变化事件处理 - 动态调整表格列宽"""
@@ -1005,6 +1026,236 @@ class CrazySaturdayApp:
             # 创建一个空的状态文件
             self.game.save_states_to_file()
             self.create_game_screen()
+    
+    def create_fixed_participants_screen(self):
+        """创建固定参赛选手管理界面"""
+        # 清除现有界面
+        for widget in self.root.winfo_children():
+            widget.destroy()
+        
+        # 标题
+        title_label = tk.Label(self.root, text="固定参赛选手管理", 
+                              font=('Arial', 16, 'bold'))
+        title_label.pack(pady=10)
+        
+        # 返回按钮
+        back_button = tk.Button(self.root, text="返回主界面", 
+                                command=self.create_setup_screen,
+                                font=('Arial', 12), width=15)
+        back_button.pack(pady=10)
+        
+        # 主框架
+        main_frame = tk.Frame(self.root)
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        # 左侧：选手列表
+        list_frame = tk.Frame(main_frame)
+        list_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=5)
+        
+        tk.Label(list_frame, text="固定参赛选手列表", font=('Arial', 12, 'bold')).pack(pady=5)
+        
+        # 创建Treeview显示选手列表
+        columns = ("name", "contact", "email", "address", "initial_hp")
+        self.fixed_participants_tree = ttk.Treeview(list_frame, columns=columns, show="headings", height=15)
+        self.fixed_participants_tree.heading("name", text="姓名")
+        self.fixed_participants_tree.heading("contact", text="联系方式")
+        self.fixed_participants_tree.heading("email", text="邮箱")
+        self.fixed_participants_tree.heading("address", text="家庭住址")
+        self.fixed_participants_tree.heading("initial_hp", text="初始HP")
+        
+        self.fixed_participants_tree.column("name", width=100)
+        self.fixed_participants_tree.column("contact", width=120)
+        self.fixed_participants_tree.column("email", width=150)
+        self.fixed_participants_tree.column("address", width=200)
+        self.fixed_participants_tree.column("initial_hp", width=60)
+        
+        self.fixed_participants_tree.pack(fill=tk.BOTH, expand=True)
+        self.fixed_participants_tree.bind("<<TreeviewSelect>>", self.on_fixed_participant_select)
+        
+        # 右侧：编辑区域
+        edit_frame = tk.Frame(main_frame)
+        edit_frame.pack(side=tk.RIGHT, fill=tk.BOTH, padx=5)
+        
+        tk.Label(edit_frame, text="选手信息编辑", font=('Arial', 12, 'bold')).pack(pady=5)
+        
+        # 表单框架
+        form_frame = tk.Frame(edit_frame)
+        form_frame.pack(pady=10)
+        
+        # 姓名
+        name_label_frame = tk.Frame(form_frame)
+        name_label_frame.grid(row=0, column=0, sticky=tk.E, pady=5)
+        tk.Label(name_label_frame, text="姓名").pack(side=tk.LEFT)
+        tk.Label(name_label_frame, text="*", fg="red").pack(side=tk.LEFT)
+        tk.Label(name_label_frame, text=":").pack(side=tk.LEFT)
+        self.fp_name_var = tk.StringVar()
+        tk.Entry(form_frame, textvariable=self.fp_name_var, width=25).grid(row=0, column=1, pady=5)
+        
+        # 联系方式
+        contact_label_frame = tk.Frame(form_frame)
+        contact_label_frame.grid(row=1, column=0, sticky=tk.E, pady=5)
+        tk.Label(contact_label_frame, text="联系方式").pack(side=tk.LEFT)
+        tk.Label(contact_label_frame, text="*", fg="red").pack(side=tk.LEFT)
+        tk.Label(contact_label_frame, text=":").pack(side=tk.LEFT)
+        self.fp_contact_var = tk.StringVar()
+        tk.Entry(form_frame, textvariable=self.fp_contact_var, width=25).grid(row=1, column=1, pady=5)
+        
+        # 邮箱
+        tk.Label(form_frame, text="邮箱:").grid(row=2, column=0, sticky=tk.E, pady=5)
+        self.fp_email_var = tk.StringVar()
+        tk.Entry(form_frame, textvariable=self.fp_email_var, width=25).grid(row=2, column=1, pady=5)
+        
+        # 家庭住址
+        tk.Label(form_frame, text="家庭住址:").grid(row=3, column=0, sticky=tk.E, pady=5)
+        self.fp_address_var = tk.StringVar()
+        tk.Entry(form_frame, textvariable=self.fp_address_var, width=25).grid(row=3, column=1, pady=5)
+        
+        # 初始HP
+        hp_label_frame = tk.Frame(form_frame)
+        hp_label_frame.grid(row=4, column=0, sticky=tk.E, pady=5)
+        tk.Label(hp_label_frame, text="初始HP").pack(side=tk.LEFT)
+        tk.Label(hp_label_frame, text="*", fg="red").pack(side=tk.LEFT)
+        tk.Label(hp_label_frame, text=":").pack(side=tk.LEFT)
+        self.fp_hp_var = tk.IntVar(value=2)
+        hp_frame = tk.Frame(form_frame)
+        hp_frame.grid(row=4, column=1, sticky=tk.W, pady=5)
+        for hp in range(2, 9):
+            tk.Radiobutton(hp_frame, text=str(hp), variable=self.fp_hp_var, value=hp).pack(side=tk.LEFT)
+        
+        # 按钮区域
+        button_frame = tk.Frame(edit_frame)
+        button_frame.pack(pady=20)
+        
+        tk.Button(button_frame, text="添加选手", command=self.add_fixed_participant, 
+                 width=12).grid(row=0, column=0, padx=5, pady=5)
+        tk.Button(button_frame, text="修改选手", command=self.update_fixed_participant, 
+                 width=12).grid(row=0, column=1, padx=5, pady=5)
+        tk.Button(button_frame, text="删除选手", command=self.delete_fixed_participant, 
+                 width=12).grid(row=0, column=2, padx=5, pady=5)
+        tk.Button(button_frame, text="清空表单", command=self.clear_fixed_participant_form, 
+                 width=12).grid(row=1, column=0, columnspan=3, pady=5)
+        
+        # 当前选中的选手
+        self.current_selected_fixed_participant = None
+        
+        # 刷新选手列表
+        self.refresh_fixed_participants_list()
+    
+    def refresh_fixed_participants_list(self):
+        """刷新固定参赛选手列表"""
+        # 清空列表
+        for item in self.fixed_participants_tree.get_children():
+            self.fixed_participants_tree.delete(item)
+        
+        # 添加所有选手
+        for participant in self.fixed_participant_manager.get_all_participants():
+            self.fixed_participants_tree.insert("", tk.END, values=(
+                participant.name,
+                participant.contact,
+                participant.email,
+                participant.address,
+                participant.initial_hp
+            ))
+    
+    def on_fixed_participant_select(self, event):
+        """选择选手时填充表单"""
+        selected_items = self.fixed_participants_tree.selection()
+        if selected_items:
+            item = self.fixed_participants_tree.item(selected_items[0])
+            values = item["values"]
+            self.fp_name_var.set(values[0])
+            self.fp_contact_var.set(values[1])
+            self.fp_email_var.set(values[2])
+            self.fp_address_var.set(values[3])
+            self.fp_hp_var.set(values[4])
+            self.current_selected_fixed_participant = values[0]
+    
+    def add_fixed_participant(self):
+        """添加固定参赛选手"""
+        name = self.fp_name_var.get().strip()
+        contact = self.fp_contact_var.get().strip()
+        email = self.fp_email_var.get().strip()
+        address = self.fp_address_var.get().strip()
+        initial_hp = self.fp_hp_var.get()
+        
+        # 验证必填字段
+        if not name or not contact:
+            messagebox.showerror("错误", "姓名和联系方式为必填项！")
+            return
+        
+        # 验证姓名格式（和主界面保持一致）
+        if len(name) < 1 or len(name) > 20:
+            messagebox.showerror("错误", "姓名长度必须在1-20个字符之间！")
+            return
+        
+        # 创建选手
+        participant = FixedParticipant(name, contact, email, address, initial_hp)
+        
+        # 添加选手
+        if self.fixed_participant_manager.add_participant(participant):
+            messagebox.showinfo("成功", f"选手 {name} 添加成功！")
+            self.refresh_fixed_participants_list()
+            self.clear_fixed_participant_form()
+        else:
+            messagebox.showerror("错误", f"选手 {name} 已存在！")
+    
+    def update_fixed_participant(self):
+        """更新固定参赛选手"""
+        if not self.current_selected_fixed_participant:
+            messagebox.showerror("错误", "请先选择要修改的选手！")
+            return
+        
+        name = self.fp_name_var.get().strip()
+        contact = self.fp_contact_var.get().strip()
+        email = self.fp_email_var.get().strip()
+        address = self.fp_address_var.get().strip()
+        initial_hp = self.fp_hp_var.get()
+        
+        # 验证必填字段
+        if not name or not contact:
+            messagebox.showerror("错误", "姓名和联系方式为必填项！")
+            return
+        
+        # 验证姓名格式
+        if len(name) < 1 or len(name) > 20:
+            messagebox.showerror("错误", "姓名长度必须在1-20个字符之间！")
+            return
+        
+        # 创建选手
+        participant = FixedParticipant(name, contact, email, address, initial_hp)
+        
+        # 更新选手
+        if self.fixed_participant_manager.update_participant(self.current_selected_fixed_participant, participant):
+            messagebox.showinfo("成功", f"选手信息更新成功！")
+            self.refresh_fixed_participants_list()
+            self.clear_fixed_participant_form()
+        else:
+            messagebox.showerror("错误", "选手更新失败，可能姓名已存在！")
+    
+    def delete_fixed_participant(self):
+        """删除固定参赛选手"""
+        if not self.current_selected_fixed_participant:
+            messagebox.showerror("错误", "请先选择要删除的选手！")
+            return
+        
+        name = self.current_selected_fixed_participant
+        if messagebox.askyesno("确认", f"确定要删除选手 {name} 吗？"):
+            if self.fixed_participant_manager.delete_participant(name):
+                messagebox.showinfo("成功", f"选手 {name} 删除成功！")
+                self.refresh_fixed_participants_list()
+                self.clear_fixed_participant_form()
+    
+    def clear_fixed_participant_form(self):
+        """清空表单"""
+        self.fp_name_var.set("")
+        self.fp_contact_var.set("")
+        self.fp_email_var.set("")
+        self.fp_address_var.set("")
+        self.fp_hp_var.set(2)
+        self.current_selected_fixed_participant = None
+        # 取消选择
+        for item in self.fixed_participants_tree.selection():
+            self.fixed_participants_tree.selection_remove(item)
     
     def run(self):
         self.root.mainloop()
