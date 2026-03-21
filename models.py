@@ -627,12 +627,27 @@ class Game:
         elif was_host:
             self.adjust_table_positions_after_host_elimination(table)
         
-        # 如果这个球台被标记为需要关闭，处理减桌逻辑
+        # 特殊情况处理：如果球台没有挑战者且没有候补者，标记为需要关闭
+        if table.challenger is None and not table.waiting and table.host is not None:
+            if table.table_id not in self.tables_to_close:
+                print(f"DEBUG: 特殊情况 - 球台 {table.table_id} 没有挑战者和候补者，标记为需要关闭")
+                self.tables_to_close[table.table_id] = True
+                self.closing_tables[table.table_id] = table
+        
+        # 如果这个球台被标记为需要关闭，先处理一次减桌逻辑
         if table.table_id in self.tables_to_close:
             self.process_closing_table_after_elimination(table)
         
         # 判负离场后，尽可能安排场外候补选手上桌
         self.fill_leftover_tables()
+        
+        # 完成上场流程后，再次检查：如果球台被标记为撤桌且没有挑战者，将擂主一起离场
+        if table.table_id in self.tables_to_close and table.challenger is None and table.host is not None:
+            self.finalize_table_closing(table)
+        
+        # 额外检查：如果球台没有挑战者且被标记为需要关闭，无论何时都关闭球台
+        if table.table_id in self.tables_to_close and table.challenger is None:
+            self.finalize_table_closing(table)
         
         # 保存判负离场后的状态
         self.save_state(f"{table_id}号台: {player.name} 判负离场")
