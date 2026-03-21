@@ -176,7 +176,7 @@ class Game:
         
         # 人数阈值对应的球台数量
         self.table_thresholds = {
-            2: 1, 7: 2, 11: 3, 15: 4, 18: 5, 21: 6, 25: 7, 28: 8, 32: 9
+            1: 1, 6: 2, 10: 3, 14: 4, 17: 5, 20: 6, 24: 7, 27: 8, 31: 9
         }
         
         # 减桌相关状态
@@ -190,11 +190,11 @@ class Game:
         # 状态机相关属性
         self.state_history = []  # 状态历史记录
         self.current_state_index = -1  # 当前状态索引
-        self.max_states = 10000  # 最大状态记录数量
+        self.max_states = 1000  # 最大状态记录数量
     
     def calculate_required_tables(self, player_count: int) -> int:
         """根据选手数量计算需要的球台数量"""
-        if player_count < 2:
+        if player_count <= 1:
             return 0
         elif player_count <= 6:
             return 1
@@ -219,7 +219,7 @@ class Game:
         # 根据人数确定球台数量
         table_count = 1
         for threshold, count in sorted(self.table_thresholds.items()):
-            if player_count >= threshold:
+            if player_count > threshold:
                 table_count = count
         
         # 创建球台
