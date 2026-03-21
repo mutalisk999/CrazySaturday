@@ -1,6 +1,6 @@
 import tkinter as tk
 from tkinter import ttk, scrolledtext, messagebox
-from models import Game, FixedParticipant, FixedParticipantManager
+from models import Game, FixedParticipant, FixedParticipantManager, TableThresholdsManager
 
 class CrazySaturdayApp:
     def __init__(self):
@@ -28,8 +28,11 @@ class CrazySaturdayApp:
         # 固定参赛选手管理器
         self.fixed_participant_manager = FixedParticipantManager()
         
+        # 球桌阈值管理器
+        self.thresholds_manager = TableThresholdsManager()
+        
         # 默认不装载示例选手，保持空列表
-        self.game = Game()
+        self.game = Game(self.thresholds_manager)
         
         # 设置减桌回调函数
         self.game.set_table_reduction_callback(self.show_table_reduction_dialog)
@@ -225,6 +228,12 @@ class CrazySaturdayApp:
         # 按钮区域
         button_frame = tk.Frame(self.root)
         button_frame.pack(pady=20)
+        
+        # 设定球桌阈值按钮
+        thresholds_button = tk.Button(button_frame, text="设定球桌阈值", 
+                                     command=self.create_table_thresholds_screen,
+                                     bg='purple', fg='white', font=('Arial', 12, 'bold'))
+        thresholds_button.pack(side='left', padx=10)
         
         # 固定参赛选手按钮
         fixed_button = tk.Button(button_frame, text="固定参赛选手", 
@@ -1026,6 +1035,137 @@ class CrazySaturdayApp:
             # 创建一个空的状态文件
             self.game.save_states_to_file()
             self.create_game_screen()
+    
+    def create_table_thresholds_screen(self):
+        """创建球桌阈值设定界面"""
+        # 清除现有界面
+        for widget in self.root.winfo_children():
+            widget.destroy()
+        
+        # 标题
+        title_label = tk.Label(self.root, text="设定球桌阈值", 
+                              font=('Arial', 16, 'bold'))
+        title_label.pack(pady=10)
+        
+        # 返回按钮
+        back_button = tk.Button(self.root, text="返回主界面", 
+                                command=self.create_setup_screen,
+                                font=('Arial', 12), width=15)
+        back_button.pack(pady=10)
+        
+        # 说明文字
+        info_frame = tk.Frame(self.root)
+        info_frame.pack(pady=10)
+        
+        tk.Label(info_frame, text="说明：修改阈值后，game_states.json 历史状态文件将被删除！", 
+                fg='red', font=('Arial', 12, 'bold')).pack()
+        
+        # 阈值输入区域
+        thresholds_frame = tk.Frame(self.root)
+        thresholds_frame.pack(pady=10)
+        
+        # 创建8个阈值输入框
+        self.threshold_vars = []
+        default_thresholds = self.thresholds_manager.thresholds
+        labels = [
+            "2张球桌需要大于 ",
+            "3张球桌需要大于 ",
+            "4张球桌需要大于 ",
+            "5张球桌需要大于 ",
+            "6张球桌需要大于 ",
+            "7张球桌需要大于 ",
+            "8张球桌需要大于 ",
+            "9张球桌需要大于 "
+        ]
+        
+        for i in range(8):
+            row_frame = tk.Frame(thresholds_frame)
+            row_frame.pack(pady=5)
+            
+            tk.Label(row_frame, text=labels[i], font=('Arial', 12)).pack(side=tk.LEFT)
+            
+            var = tk.StringVar(value=str(default_thresholds[i]))
+            self.threshold_vars.append(var)
+            
+            # 绑定回调函数，当值变化时联动更新后面的值
+            var.trace_add('write', lambda name, index, mode, idx=i: self.on_threshold_change(idx))
+            
+            entry = tk.Entry(row_frame, textvariable=var, width=10, font=('Arial', 12))
+            entry.pack(side=tk.LEFT, padx=5)
+            
+            tk.Label(row_frame, text="人", font=('Arial', 12)).pack(side=tk.LEFT)
+        
+        # 按钮区域
+        button_frame = tk.Frame(self.root)
+        button_frame.pack(pady=20)
+        
+        save_button = tk.Button(button_frame, text="保存阈值", 
+                               command=self.save_table_thresholds,
+                               bg='green', fg='white', font=('Arial', 12, 'bold'), width=12)
+        save_button.pack(side=tk.LEFT, padx=10)
+        
+        reset_button = tk.Button(button_frame, text="恢复默认", 
+                                command=self.reset_table_thresholds,
+                                bg='orange', fg='white', font=('Arial', 12, 'bold'), width=12)
+        reset_button.pack(side=tk.LEFT, padx=10)
+    
+    def on_threshold_change(self, changed_index):
+        """当某个阈值被修改时，联动更新后面的值"""
+        try:
+            # 获取当前修改的值
+            current_value = int(self.threshold_vars[changed_index].get())
+            
+            # 联动更新后面的每个值，确保至少比前一个大1
+            for i in range(changed_index + 1, 8):
+                try:
+                    # 获取当前值
+                    prev_value = int(self.threshold_vars[i-1].get())
+                    current_var_value = int(self.threshold_vars[i].get())
+                    
+                    # 如果当前值小于等于前面的值，设置为前面的值+1
+                    if current_var_value <= prev_value:
+                        self.threshold_vars[i].set(str(prev_value + 1))
+                except ValueError:
+                    pass
+        except ValueError:
+            pass
+    
+    def save_table_thresholds(self):
+        """保存球桌阈值"""
+        try:
+            # 获取输入的阈值
+            thresholds = []
+            for var in self.threshold_vars:
+                value = int(var.get())
+                thresholds.append(value)
+            
+            # 验证并保存
+            success, error_msg = self.thresholds_manager.set_thresholds(thresholds)
+            if success:
+                # 重新初始化game，使用新的阈值
+                self.game = Game(self.thresholds_manager)
+                self.game.set_table_reduction_callback(self.show_table_reduction_dialog)
+                
+                messagebox.showinfo("成功", "球桌阈值保存成功！\ngame_states.json 历史状态文件已删除。")
+                self.create_setup_screen()
+            else:
+                messagebox.showerror("错误", f"阈值设置失败：{error_msg}")
+        except ValueError:
+            messagebox.showerror("错误", "请输入有效的整数！")
+    
+    def reset_table_thresholds(self):
+        """恢复默认阈值"""
+        default_thresholds = TableThresholdsManager.DEFAULT_THRESHOLDS
+        success, error_msg = self.thresholds_manager.set_thresholds(default_thresholds)
+        if success:
+            # 重新初始化game，使用新的阈值
+            self.game = Game(self.thresholds_manager)
+            self.game.set_table_reduction_callback(self.show_table_reduction_dialog)
+            
+            messagebox.showinfo("成功", "已恢复默认阈值！\ngame_states.json 历史状态文件已删除。")
+            self.create_table_thresholds_screen()
+        else:
+            messagebox.showerror("错误", f"恢复默认失败：{error_msg}")
     
     def create_fixed_participants_screen(self):
         """创建固定参赛选手管理界面"""
