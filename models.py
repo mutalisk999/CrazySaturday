@@ -57,8 +57,190 @@ class Table:
             player.position = f"{self.table_id}号台候补"
             player.table_id = self.table_id
 
-class Game:
+class FixedParticipant:
+    """固定参赛选手类"""
+    def __init__(self, name: str, contact: str, email: str = "", address: str = "", initial_hp: int = 2):
+        self.name = name
+        self.contact = contact
+        self.email = email
+        self.address = address
+        self.initial_hp = initial_hp
+    
+    def to_dict(self):
+        """转换为字典格式"""
+        return {
+            "name": self.name,
+            "contact": self.contact,
+            "email": self.email,
+            "address": self.address,
+            "initial_hp": self.initial_hp
+        }
+    
+    @classmethod
+    def from_dict(cls, data: dict):
+        """从字典创建实例"""
+        return cls(
+            name=data["name"],
+            contact=data["contact"],
+            email=data.get("email", ""),
+            address=data.get("address", ""),
+            initial_hp=data.get("initial_hp", 2)
+        )
+
+class FixedParticipantManager:
+    """固定参赛选手管理类"""
+    def __init__(self, filename: str = "fixed_participants.json"):
+        self.filename = filename
+        self.participants: Dict[str, FixedParticipant] = {}
+        self.load()
+    
+    def load(self):
+        """从文件加载固定参赛选手"""
+        import os
+        import json
+        
+        if os.path.exists(self.filename):
+            try:
+                with open(self.filename, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    self.participants = {}
+                    for name, participant_data in data.items():
+                        self.participants[name] = FixedParticipant.from_dict(participant_data)
+            except Exception as e:
+                print(f"加载固定参赛选手失败: {e}")
+                self.participants = {}
+    
+    def save(self):
+        """保存固定参赛选手到文件"""
+        import json
+        
+        data = {}
+        for name, participant in self.participants.items():
+            data[name] = participant.to_dict()
+        
+        with open(self.filename, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    
+    def add_participant(self, participant: FixedParticipant) -> bool:
+        """添加固定参赛选手"""
+        if participant.name in self.participants:
+            return False
+        self.participants[participant.name] = participant
+        self.save()
+        return True
+    
+    def update_participant(self, old_name: str, participant: FixedParticipant) -> bool:
+        """更新固定参赛选手"""
+        if old_name in self.participants:
+            if old_name != participant.name and participant.name in self.participants:
+                return False
+            del self.participants[old_name]
+            self.participants[participant.name] = participant
+            self.save()
+            return True
+        return False
+    
+    def delete_participant(self, name: str) -> bool:
+        """删除固定参赛选手"""
+        if name in self.participants:
+            del self.participants[name]
+            self.save()
+            return True
+        return False
+    
+    def get_participant(self, name: str) -> Optional[FixedParticipant]:
+        """获取固定参赛选手"""
+        return self.participants.get(name)
+    
+    def get_all_participants(self) -> List[FixedParticipant]:
+        """获取所有固定参赛选手"""
+        return list(self.participants.values())
+    
+    def get_all_names(self) -> List[str]:
+        """获取所有固定参赛选手姓名"""
+        return list(self.participants.keys())
+
+class TableThresholdsManager:
+    """球桌阈值管理类"""
+    DEFAULT_THRESHOLDS = [6, 10, 14, 17, 20, 24, 27, 31]
+    THRESHOLDS_FILE = "table_thresholds.json"
+    STATE_HISTORY_FILE = "game_states.json"
+    
     def __init__(self):
+        self.thresholds = self.DEFAULT_THRESHOLDS.copy()
+        self.load()
+    
+    def load(self):
+        """从文件加载球桌阈值"""
+        import os
+        import json
+        
+        if os.path.exists(self.THRESHOLDS_FILE):
+            try:
+                with open(self.THRESHOLDS_FILE, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    if isinstance(data, list) and len(data) == 8:
+                        self.thresholds = data
+            except Exception as e:
+                print(f"加载球桌阈值失败: {e}")
+                self.thresholds = self.DEFAULT_THRESHOLDS.copy()
+    
+    def save(self):
+        """保存球桌阈值到文件"""
+        import json
+        
+        with open(self.THRESHOLDS_FILE, 'w', encoding='utf-8') as f:
+            json.dump(self.thresholds, f, ensure_ascii=False)
+    
+    def validate_thresholds(self, thresholds):
+        """校验阈值是否有效"""
+        if len(thresholds) != 8:
+            return False, "阈值数量必须为8个"
+        
+        for i, t in enumerate(thresholds):
+            if not isinstance(t, int) or t <= 0:
+                return False, f"第{i+1}个阈值必须是正整数"
+        
+        for i in range(1, len(thresholds)):
+            if thresholds[i] <= thresholds[i-1]:
+                return False, f"第{i+1}个阈值必须大于第{i}个阈值"
+        
+        return True, ""
+    
+    def set_thresholds(self, thresholds):
+        """设置新的阈值，返回是否成功和错误信息"""
+        is_valid, error_msg = self.validate_thresholds(thresholds)
+        if not is_valid:
+            return False, error_msg
+        
+        self.thresholds = thresholds.copy()
+        self.save()
+        
+        import os
+        if os.path.exists(self.STATE_HISTORY_FILE):
+            try:
+                os.remove(self.STATE_HISTORY_FILE)
+            except Exception as e:
+                print(f"删除历史状态文件失败: {e}")
+        
+        return True, ""
+    
+    def get_thresholds_dict(self):
+        """获取阈值字典格式"""
+        return {
+            1: 1,
+            self.thresholds[0]: 2,
+            self.thresholds[1]: 3,
+            self.thresholds[2]: 4,
+            self.thresholds[3]: 5,
+            self.thresholds[4]: 6,
+            self.thresholds[5]: 7,
+            self.thresholds[6]: 8,
+            self.thresholds[7]: 9
+        }
+
+class Game:
+    def __init__(self, thresholds_manager=None):
         self.players = []
         self.tables = []
         self.outside_waiting = []  # 场外候补
@@ -71,10 +253,9 @@ class Game:
         self.table_priority = [2, 3, 4, 5, 6, 7, 8, 9, 1]
         self.table_close_order = [1, 9, 8, 7, 6, 5, 4, 3, 2]  # 减桌顺序：优先撤最后使用的球台
         
-        # 人数阈值对应的球台数量
-        self.table_thresholds = {
-            2: 1, 7: 2, 11: 3, 15: 4, 18: 5, 21: 6, 25: 7, 28: 8, 32: 9
-        }
+        # 球桌阈值管理
+        self.thresholds_manager = thresholds_manager if thresholds_manager else TableThresholdsManager()
+        self.table_thresholds = self.thresholds_manager.get_thresholds_dict()
         
         # 减桌相关状态
         self.tables_to_close = {}  # 需要关闭的球台字典 {table_id: True}
@@ -87,27 +268,29 @@ class Game:
         # 状态机相关属性
         self.state_history = []  # 状态历史记录
         self.current_state_index = -1  # 当前状态索引
-        self.max_states = 100  # 最大状态记录数量
+        self.max_states = 1000  # 最大状态记录数量
     
     def calculate_required_tables(self, player_count: int) -> int:
         """根据选手数量计算需要的球台数量"""
-        if player_count < 2:
+        if player_count <= 1:
             return 0
-        elif player_count <= 6:
+        
+        thresholds = self.thresholds_manager.thresholds
+        if player_count <= thresholds[0]:
             return 1
-        elif player_count <= 10:
+        elif player_count <= thresholds[1]:
             return 2
-        elif player_count <= 14:
+        elif player_count <= thresholds[2]:
             return 3
-        elif player_count <= 17:
+        elif player_count <= thresholds[3]:
             return 4
-        elif player_count <= 20:
+        elif player_count <= thresholds[4]:
             return 5
-        elif player_count <= 24:
+        elif player_count <= thresholds[5]:
             return 6
-        elif player_count <= 27:
+        elif player_count <= thresholds[6]:
             return 7
-        elif player_count <= 31:
+        elif player_count <= thresholds[7]:
             return 8
         else:
             return 9
@@ -116,7 +299,7 @@ class Game:
         # 根据人数确定球台数量
         table_count = 1
         for threshold, count in sorted(self.table_thresholds.items()):
-            if player_count >= threshold:
+            if player_count > threshold:
                 table_count = count
         
         # 创建球台
@@ -524,12 +707,27 @@ class Game:
         elif was_host:
             self.adjust_table_positions_after_host_elimination(table)
         
-        # 如果这个球台被标记为需要关闭，处理减桌逻辑
+        # 特殊情况处理：如果球台没有挑战者且没有候补者，标记为需要关闭
+        if table.challenger is None and not table.waiting and table.host is not None:
+            if table.table_id not in self.tables_to_close:
+                print(f"DEBUG: 特殊情况 - 球台 {table.table_id} 没有挑战者和候补者，标记为需要关闭")
+                self.tables_to_close[table.table_id] = True
+                self.closing_tables[table.table_id] = table
+        
+        # 如果这个球台被标记为需要关闭，先处理一次减桌逻辑
         if table.table_id in self.tables_to_close:
             self.process_closing_table_after_elimination(table)
         
         # 判负离场后，尽可能安排场外候补选手上桌
         self.fill_leftover_tables()
+        
+        # 完成上场流程后，再次检查：如果球台被标记为撤桌且没有挑战者，将擂主一起离场
+        if table.table_id in self.tables_to_close and table.challenger is None and table.host is not None:
+            self.finalize_table_closing(table)
+        
+        # 额外检查：如果球台没有挑战者且被标记为需要关闭，无论何时都关闭球台
+        if table.table_id in self.tables_to_close and table.challenger is None:
+            self.finalize_table_closing(table)
         
         # 保存判负离场后的状态
         self.save_state(f"{table_id}号台: {player.name} 判负离场")
@@ -801,7 +999,7 @@ class Game:
             "game_state": self.game_state,
             "winner": self.winner.name if self.winner else None,
             "tables_to_close": self.tables_to_close.copy(),
-            "closing_tables": self.closing_tables.copy(),
+            "closing_tables": {k: True for k in self.closing_tables.keys()},  # 只保存table_id
             "leftover_tables_queue": self.leftover_tables_queue.copy()
         }
         
@@ -842,10 +1040,19 @@ class Game:
         self.game_state = state["game_state"]
         self.winner = self._find_player_by_name(state["winner"]) if state["winner"] else None
         self.tables_to_close = state["tables_to_close"].copy()
-        self.closing_tables = state["closing_tables"].copy()
+        # 恢复closing_tables：根据保存的table_id找到对应的Table对象
+        self.closing_tables = {}
+        for table_id in state["closing_tables"].keys():
+            table = self.get_table_by_id(table_id)
+            if table:
+                self.closing_tables[table_id] = table
         self.leftover_tables_queue = state["leftover_tables_queue"].copy()
         
         self.current_state_index = state_index
+        
+        # 重新检查撤桌条件，确保所有符合撤桌条件的桌台都被标记
+        self.check_table_reduction()
+        
         return True
     
     def delete_future_states(self):
