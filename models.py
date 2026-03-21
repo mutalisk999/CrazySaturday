@@ -766,14 +766,6 @@ class Game:
         if self.game_state != "running":
             return
         
-        # 检查比赛是否结束
-        remaining_players = self.get_remaining_players_count()
-        if remaining_players <= 1:
-            self.game_state = "finished"
-            if remaining_players == 1:
-                self.winner = [p for p in self.players if not p.is_eliminated()][0]
-            return
-        
         # 检查是否需要减少球台
         self.check_table_reduction()
         
@@ -784,6 +776,14 @@ class Game:
         
         # 处理已离场桌台队列，安排场外候补选手上桌
         self.fill_leftover_tables()
+        
+        # 检查比赛是否结束
+        remaining_players = self.get_remaining_players_count()
+        if remaining_players <= 1:
+            self.game_state = "finished"
+            if remaining_players == 1:
+                self.winner = [p for p in self.players if not p.is_eliminated()][0]
+            return
     
     def save_state(self, description=""):
         """保存当前游戏状态到历史记录"""

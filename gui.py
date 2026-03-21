@@ -304,14 +304,6 @@ class CrazySaturdayApp:
                 
                 table_count += 1
                 
-                # 擂主
-                host_text = f"擂主: {table.host.name if table.host else '无'}"
-                if table.host:
-                    host_text += f" ({table.host.current_lives}/{table.host.initial_lives})"
-                    host_color = 'red' if table.host.current_lives == 1 else 'black'
-                else:
-                    host_color = 'black'
-                
                 # 擂主区域 - 包含判负离场按钮和选手信息
                 host_frame = tk.Frame(table_frame)
                 host_frame.pack(fill='x', padx=10)
@@ -323,9 +315,19 @@ class CrazySaturdayApp:
                                           self.eliminate_player(p, tid, "擂主"))
                     host_button.pack(side='left', padx=(0, 5))
                 
-                # 擂主信息标签
-                host_label = tk.Label(host_frame, text=host_text, fg=host_color, anchor='w', font=('Microsoft YaHei', 11, 'bold'))
-                host_label.pack(side='left', fill='x', expand=True)
+                # 擂主信息标签 - 分为两个标签，只有选手名字变红
+                host_label_prefix = tk.Label(host_frame, text="擂主: ", anchor='w', font=('Microsoft YaHei', 11, 'bold'))
+                host_label_prefix.pack(side='left')
+                
+                if table.host:
+                    host_name_text = f"{table.host.name} ({table.host.current_lives}/{table.host.initial_lives})"
+                    host_name_color = 'red' if table.host.current_lives == 1 else 'black'
+                else:
+                    host_name_text = '无'
+                    host_name_color = 'black'
+                
+                host_label_name = tk.Label(host_frame, text=host_name_text, fg=host_name_color, anchor='w', font=('Microsoft YaHei', 11, 'bold'))
+                host_label_name.pack(side='left', fill='x', expand=True)
                 
                 # 挑战者区域 - 包含判负离场按钮和选手信息
                 challenger_frame = tk.Frame(table_frame)
@@ -338,16 +340,19 @@ class CrazySaturdayApp:
                                                  self.eliminate_player(p, tid, "挑战者"))
                     challenger_button.pack(side='left', padx=(0, 5))
                 
-                # 挑战者信息标签
-                challenger_text = f"挑战者: {table.challenger.name if table.challenger else '无'}"
-                if table.challenger:
-                    challenger_text += f" ({table.challenger.current_lives}/{table.challenger.initial_lives})"
-                    challenger_color = 'red' if table.challenger.current_lives == 1 else 'black'
-                else:
-                    challenger_color = 'black'
+                # 挑战者信息标签 - 分为两个标签，只有选手名字变红
+                challenger_label_prefix = tk.Label(challenger_frame, text="挑战者: ", anchor='w', font=('Microsoft YaHei', 11, 'bold'))
+                challenger_label_prefix.pack(side='left')
                 
-                challenger_label = tk.Label(challenger_frame, text=challenger_text, fg=challenger_color, anchor='w', font=('Microsoft YaHei', 11, 'bold'))
-                challenger_label.pack(side='left', fill='x', expand=True)
+                if table.challenger:
+                    challenger_name_text = f"{table.challenger.name} ({table.challenger.current_lives}/{table.challenger.initial_lives})"
+                    challenger_name_color = 'red' if table.challenger.current_lives == 1 else 'black'
+                else:
+                    challenger_name_text = '无'
+                    challenger_name_color = 'black'
+                
+                challenger_label_name = tk.Label(challenger_frame, text=challenger_name_text, fg=challenger_name_color, anchor='w', font=('Microsoft YaHei', 11, 'bold'))
+                challenger_label_name.pack(side='left', fill='x', expand=True)
                 
                 # 候补 - 显示详细信息（候补选手不能被淘汰）
                 waiting_frame = tk.Frame(table_frame)
@@ -367,7 +372,11 @@ class CrazySaturdayApp:
                         if i > 0:
                             player_text = "，" + player_text
                         
-                        player_label = tk.Label(waiting_frame, text=player_text, anchor='w', font=('Microsoft YaHei', 11, 'bold'))
+                        # HP为1的选手显示为红色
+                        if player.current_lives == 1:
+                            player_label = tk.Label(waiting_frame, text=player_text, anchor='w', font=('Microsoft YaHei', 11, 'bold'), fg='red')
+                        else:
+                            player_label = tk.Label(waiting_frame, text=player_text, anchor='w', font=('Microsoft YaHei', 11, 'bold'))
                         player_label.pack(side='left')
                         
                         # 候补选手不能被下场，不绑定右键菜单
@@ -970,6 +979,9 @@ class CrazySaturdayApp:
         import os
         import json
         
+        # 保存当前选手列表
+        current_players = [(p.name, p.initial_lives) for p in self.game.players]
+        
         # 删除历史状态文件
         state_file = "game_states.json"
         if os.path.exists(state_file):
@@ -979,9 +991,14 @@ class CrazySaturdayApp:
         # 重新开始游戏
         self.game = Game()
         
-        # 重新添加示例选手
-        for name, lives in self.example_players:
-            self.game.add_player(name, lives)
+        # 重新添加之前保存的选手
+        if current_players:
+            for name, lives in current_players:
+                self.game.add_player(name, lives)
+        else:
+            # 如果没有选手，添加示例选手
+            for name, lives in self.example_players:
+                self.game.add_player(name, lives)
         
         # 开始新比赛并进入第二页
         if self.game.start_game():
