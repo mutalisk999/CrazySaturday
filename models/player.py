@@ -30,3 +30,11 @@ class Player:
     def lose_match(self):
         self.losses += 1
         self.streak = 0
+    
+    @property
+    def win_rate(self):
+        """计算胜率，保留两位小数"""
+        total = self.wins + self.losses
+        if total == 0:
+            return 0.0
+        return round(self.wins / total, 2)

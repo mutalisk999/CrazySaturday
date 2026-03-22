@@ -465,7 +465,7 @@ class CrazySaturdayApp:
         right_title.pack(expand=True)
         
         # 创建Notebook（选项卡控件）
-        notebook = ttk.Notebook(right_card, width=250)
+        notebook = ttk.Notebook(right_card, width=400)
         
         # 场外候补区选项卡
         waiting_frame = ttk.Frame(notebook)
@@ -475,8 +475,8 @@ class CrazySaturdayApp:
         waiting_tree = ttk.Treeview(waiting_frame, columns=("姓名", "HP"), show='headings', height=10)
         waiting_tree.heading("姓名", text="姓名")
         waiting_tree.heading("HP", text="HP")
-        waiting_tree.column("姓名", width=120, anchor='center')
-        waiting_tree.column("HP", width=80, anchor='center')
+        waiting_tree.column("姓名", width=180, anchor='center')
+        waiting_tree.column("HP", width=100, anchor='center')
         
         # 添加滚动条
         waiting_scrollbar = ttk.Scrollbar(waiting_frame, orient="vertical", command=waiting_tree.yview)
@@ -505,7 +505,7 @@ class CrazySaturdayApp:
         # 使用 Treeview 显示已淘汰选手
         eliminated_tree = ttk.Treeview(eliminated_frame, columns=("姓名",), show='headings', height=10)
         eliminated_tree.heading("姓名", text="姓名")
-        eliminated_tree.column("姓名", width=200, anchor='center')
+        eliminated_tree.column("姓名", width=280, anchor='center')
         
         # 添加滚动条
         eliminated_scrollbar = ttk.Scrollbar(eliminated_frame, orient="vertical", command=eliminated_tree.yview)
@@ -520,41 +520,82 @@ class CrazySaturdayApp:
         else:
             eliminated_tree.insert('', 'end', values=("暂无选手",))
         
-        # 连胜统计排行选项卡
-        streak_frame = ttk.Frame(notebook)
-        notebook.add(streak_frame, text="连胜统计排行")
-        
-        # 使用 Treeview 显示连胜统计
-        streak_tree = ttk.Treeview(streak_frame, columns=("排名", "姓名", "最大连胜", "当前连胜"), show='headings', height=10)
-        streak_tree.heading("排名", text="排名")
-        streak_tree.heading("姓名", text="姓名")
-        streak_tree.heading("最大连胜", text="最大连胜")
-        streak_tree.heading("当前连胜", text="当前连胜")
-        streak_tree.column("排名", width=60, anchor='center')
-        streak_tree.column("姓名", width=100, anchor='center')
-        streak_tree.column("最大连胜", width=80, anchor='center')
-        streak_tree.column("当前连胜", width=80, anchor='center')
-        
-        # 添加滚动条
-        streak_scrollbar = ttk.Scrollbar(streak_frame, orient="vertical", command=streak_tree.yview)
-        streak_tree.configure(yscrollcommand=streak_scrollbar.set)
-        
-        streak_tree.pack(side='left', fill='both', expand=True, padx=5, pady=5)
-        streak_scrollbar.pack(side='right', fill='y', pady=5)
-        
-        # 按最大连赢数排序选手
-        active_players = [p for p in self.game.players if not p.is_eliminated()]
-        sorted_by_streak = sorted(active_players, key=lambda p: p.max_streak, reverse=True)
-        
-        if sorted_by_streak:
-            for i, p in enumerate(sorted_by_streak):
-                streak_tree.insert('', 'end', values=(i+1, p.name, p.max_streak, p.streak))
-        else:
-            streak_tree.insert('', 'end', values=("", "暂无选手", "", ""))
-        
         # 比赛对局详情信息选项卡
         match_details_frame = ttk.Frame(notebook)
         notebook.add(match_details_frame, text="比赛对局详情信息")
+        
+        # 核心数据统计选项卡
+        streak_frame = ttk.Frame(notebook)
+        notebook.add(streak_frame, text="核心数据统计")
+        
+        # 创建主容器（使用Canvas实现同步滚动）
+        tree_container = tk.Frame(streak_frame)
+        tree_container.pack(side='top', fill='both', expand=True, padx=5, pady=5)
+        
+        # 左侧固定列（排名、姓名）
+        left_frame = tk.Frame(tree_container)
+        left_frame.pack(side='left', fill='y')
+        
+        self.streak_tree_left = ttk.Treeview(left_frame, columns=("排名", "姓名"), show='headings', height=10)
+        self.streak_tree_left.heading("排名", text="排名")
+        self.streak_tree_left.heading("姓名", text="姓名")
+        self.streak_tree_left.column("排名", width=50, anchor='center')
+        self.streak_tree_left.column("姓名", width=90, anchor='center')
+        self.streak_tree_left.pack(side='left', fill='both', expand=True)
+        
+        # 右侧可滚动列容器（包含Treeview和滚动条）
+        right_container = tk.Frame(tree_container)
+        right_container.pack(side='left', fill='both', expand=True)
+        
+        right_frame = tk.Frame(right_container)
+        right_frame.pack(side='left', fill='both', expand=True)
+        
+        self.streak_tree_right = ttk.Treeview(right_frame, columns=("最大连胜", "当前连胜", "胜场数", "负场数", "胜率"), show='headings', height=10)
+        self.streak_tree_right.heading("最大连胜", text="最大连胜")
+        self.streak_tree_right.heading("当前连胜", text="当前连胜")
+        self.streak_tree_right.heading("胜场数", text="胜场数")
+        self.streak_tree_right.heading("负场数", text="负场数")
+        self.streak_tree_right.heading("胜率", text="胜率")
+        self.streak_tree_right.column("最大连胜", width=70, anchor='center')
+        self.streak_tree_right.column("当前连胜", width=70, anchor='center')
+        self.streak_tree_right.column("胜场数", width=60, anchor='center')
+        self.streak_tree_right.column("负场数", width=60, anchor='center')
+        self.streak_tree_right.column("胜率", width=60, anchor='center')
+        self.streak_tree_right.pack(side='left', fill='both', expand=True)
+        
+        # 垂直滚动条（控制两个Treeview）
+        v_scrollbar = ttk.Scrollbar(right_container, orient="vertical")
+        v_scrollbar.pack(side='right', fill='y')
+        
+        # 水平滚动条
+        h_scrollbar = ttk.Scrollbar(streak_frame, orient="horizontal")
+        h_scrollbar.pack(side='bottom', fill='x', padx=5)
+        
+        # 配置滚动条
+        v_scrollbar.config(command=self._on_streak_tree_scroll)
+        h_scrollbar.config(command=self.streak_tree_right.xview)
+        
+        self.streak_tree_left.configure(yscrollcommand=v_scrollbar.set)
+        self.streak_tree_right.configure(yscrollcommand=v_scrollbar.set, xscrollcommand=h_scrollbar.set)
+        
+        # 绑定鼠标滚轮事件实现同步滚动
+        def on_mousewheel(event):
+            """处理鼠标滚轮事件"""
+            delta = -1 if event.delta > 0 else 1
+            self.streak_tree_left.yview_scroll(delta, "units")
+            self.streak_tree_right.yview_scroll(delta, "units")
+            return "break"
+        
+        self.streak_tree_left.bind("<MouseWheel>", on_mousewheel)
+        self.streak_tree_right.bind("<MouseWheel>", on_mousewheel)
+        
+        # 绑定列标题点击事件进行排序
+        self.streak_tree_right.bind("<Button-1>", self.on_streak_tree_header_click)
+        self.streak_sort_column = "最大连胜"
+        self.streak_sort_reverse = True
+        
+        # 按最大连赢数排序选手
+        self.update_streak_stats()
         
         # 使用 Treeview 显示对局详情
         match_tree = ttk.Treeview(match_details_frame, columns=("桌号", "时间", "胜者", "负者"), show='headings', height=10)
@@ -562,10 +603,10 @@ class CrazySaturdayApp:
         match_tree.heading("时间", text="时间")
         match_tree.heading("胜者", text="胜者")
         match_tree.heading("负者", text="负者")
-        match_tree.column("桌号", width=60, anchor='center')
-        match_tree.column("时间", width=80, anchor='center')
-        match_tree.column("胜者", width=100, anchor='center')
-        match_tree.column("负者", width=100, anchor='center')
+        match_tree.column("桌号", width=50, anchor='center')
+        match_tree.column("时间", width=70, anchor='center')
+        match_tree.column("胜者", width=130, anchor='center')
+        match_tree.column("负者", width=130, anchor='center')
         
         # 添加滚动条
         match_scrollbar = ttk.Scrollbar(match_details_frame, orient="vertical", command=match_tree.yview)
@@ -606,12 +647,20 @@ class CrazySaturdayApp:
         back_button.pack(side='left', padx=5)
         
         # 导出 CSV 按钮
-        export_button = tk.Button(left_frame, text="📊 导出 CSV",
+        export_button = tk.Button(left_frame, text="📊 导出对局详情列表",
                                  command=lambda: self.export_match_records_to_csv(match_tree),
                                  bg='#27ae60', fg='white',
                                  font=('Microsoft YaHei', 11, 'bold'),
-                                 width=10)
+                                 width=14)
         export_button.pack(side='left', padx=5)
+        
+        # 导出核心数据统计按钮
+        export_stats_button = tk.Button(left_frame, text="📈 导出核心数据统计",
+                                       command=self.export_streak_stats_to_csv,
+                                       bg='#3498db', fg='white',
+                                       font=('Microsoft YaHei', 11, 'bold'),
+                                       width=14)
+        export_stats_button.pack(side='left', padx=5)
         
         status_label = tk.Label(left_frame, 
                               text=f"剩余选手：{self.game.get_remaining_players_count()}",
@@ -1100,6 +1149,66 @@ class CrazySaturdayApp:
                             ])
                 else:
                     writer.writerow(["", "", "暂无对局记录", ""])
+            
+            self.show_info(f"成功导出到：{filename}")
+        except Exception as e:
+            self.show_error(f"导出失败：{str(e)}")
+    
+    def export_streak_stats_to_csv(self):
+        """导出核心数据统计到 CSV"""
+        import csv
+        from datetime import datetime
+        
+        # 生成文件名
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"核心数据统计_{timestamp}.csv"
+        
+        try:
+            with open(filename, 'w', newline='', encoding='utf-8-sig') as f:
+                writer = csv.writer(f)
+                
+                # 写入表头（所有列）
+                writer.writerow(["排名", "姓名", "最大连胜", "当前连胜", "胜场数", "负场数", "胜率"])
+                
+                # 获取所有选手数据
+                active_players = [p for p in self.game.players if not p.is_eliminated()]
+                
+                if active_players:
+                    # 根据当前排序列进行排序
+                    sort_column = getattr(self, 'streak_sort_column', '最大连胜')
+                    reverse = getattr(self, 'streak_sort_reverse', True)
+                    
+                    if sort_column == "最大连胜":
+                        sorted_players = sorted(active_players, key=lambda p: p.max_streak, reverse=reverse)
+                    elif sort_column == "当前连胜":
+                        sorted_players = sorted(active_players, key=lambda p: p.streak, reverse=reverse)
+                    elif sort_column == "胜场数":
+                        sorted_players = sorted(active_players, key=lambda p: p.wins, reverse=reverse)
+                    elif sort_column == "负场数":
+                        sorted_players = sorted(active_players, key=lambda p: p.losses, reverse=reverse)
+                    elif sort_column == "胜率":
+                        def get_win_rate(p):
+                            total = p.wins + p.losses
+                            if total == 0:
+                                return 0.0
+                            return float(p.wins) / float(total)
+                        sorted_players = sorted(active_players, key=get_win_rate, reverse=reverse)
+                    else:
+                        sorted_players = active_players
+                    
+                    # 写入数据
+                    for i, p in enumerate(sorted_players):
+                        writer.writerow([
+                            i + 1,  # 排名
+                            p.name,
+                            p.max_streak,
+                            p.streak,
+                            p.wins,
+                            p.losses,
+                            f"{p.win_rate*100:.0f}%"  # 胜率百分比
+                        ])
+                else:
+                    writer.writerow(["", "暂无选手", "", "", "", "", ""])
             
             self.show_info(f"成功导出到：{filename}")
         except Exception as e:
@@ -1799,6 +1908,92 @@ class CrazySaturdayApp:
 
         # 刷新选手列表
         self.refresh_fixed_participants_list()
+    
+    def update_streak_stats(self):
+        """更新核心数据统计表格"""
+        # 清空现有数据
+        for item in self.streak_tree_left.get_children():
+            self.streak_tree_left.delete(item)
+        for item in self.streak_tree_right.get_children():
+            self.streak_tree_right.delete(item)
+        
+        # 获取所有未被淘汰的选手
+        active_players = [p for p in self.game.players if not p.is_eliminated()]
+        
+        # 根据当前排序列进行排序
+        sort_column = self.streak_sort_column
+        reverse = self.streak_sort_reverse
+        
+        if sort_column == "最大连胜":
+            sorted_players = sorted(active_players, key=lambda p: p.max_streak, reverse=reverse)
+        elif sort_column == "当前连胜":
+            sorted_players = sorted(active_players, key=lambda p: p.streak, reverse=reverse)
+        elif sort_column == "胜场数":
+            sorted_players = sorted(active_players, key=lambda p: p.wins, reverse=reverse)
+        elif sort_column == "负场数":
+            sorted_players = sorted(active_players, key=lambda p: p.losses, reverse=reverse)
+        elif sort_column == "胜率":
+            # 使用原始胜率值进行排序，避免四舍五入导致的排序问题
+            # 使用浮点数除法确保精度
+            def get_win_rate(p):
+                total = p.wins + p.losses
+                if total == 0:
+                    return 0.0
+                return float(p.wins) / float(total)
+            sorted_players = sorted(active_players, key=get_win_rate, reverse=reverse)
+        else:
+            sorted_players = active_players
+        
+        # 填充数据
+        if sorted_players:
+            for i, p in enumerate(sorted_players):
+                # 左侧固定列
+                self.streak_tree_left.insert('', 'end', values=(i+1, p.name))
+                # 右侧可滚动列
+                self.streak_tree_right.insert('', 'end', values=(
+                    p.max_streak, 
+                    p.streak,
+                    p.wins,
+                    p.losses,
+                    f"{p.win_rate*100:.0f}%"
+                ))
+        else:
+            self.streak_tree_left.insert('', 'end', values=("", "暂无选手"))
+            self.streak_tree_right.insert('', 'end', values=("", "", "", "", ""))
+    
+    def _on_streak_tree_scroll(self, *args):
+        """同步滚动左右两个Treeview"""
+        self.streak_tree_left.yview(*args)
+        self.streak_tree_right.yview(*args)
+    
+    def on_streak_tree_header_click(self, event):
+        """处理统计表格列标题点击事件"""
+        # 获取点击的列
+        region = self.streak_tree_right.identify("region", event.x, event.y)
+        if region != "heading":
+            return
+        
+        column = self.streak_tree_right.identify_column(event.x)
+        heading_text = None
+        
+        # 获取列标题文本 - 通过列ID映射
+        # column 返回的是 #1, #2, #3 等格式
+        col_index = int(column.replace("#", "")) - 1
+        if 0 <= col_index < len(self.streak_tree_right["columns"]):
+            heading_text = self.streak_tree_right["columns"][col_index]
+        
+        if not heading_text:
+            return
+        
+        # 切换排序方向
+        if self.streak_sort_column == heading_text:
+            self.streak_sort_reverse = not self.streak_sort_reverse
+        else:
+            self.streak_sort_column = heading_text
+            self.streak_sort_reverse = True
+        
+        # 更新统计数据
+        self.update_streak_stats()
     
     def refresh_fixed_participants_list(self):
         """刷新固定参赛选手列表"""
