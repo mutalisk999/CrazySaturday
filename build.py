@@ -11,6 +11,15 @@ def main():
     """主打包函数"""
     print("开始打包疯狂星期六程序...")
     
+    # 删除旧的可执行文件
+    dist_dir = 'dist'
+    exe_file = os.path.join(dist_dir, 'CrazySaturday.exe')
+    
+    if os.path.exists(exe_file):
+        print(f"删除旧的可执行文件: {exe_file}")
+        os.remove(exe_file)
+        print("✅ 旧文件已删除")
+    
     # PyInstaller配置参数
     params = [
         'crazy_saturday.py',           # 主程序文件
