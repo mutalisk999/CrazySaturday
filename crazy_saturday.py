@@ -5,6 +5,12 @@
 这是一个基于tkinter的桌球比赛模拟游戏，完全按照rules.md文档中的规则实现。
 """
 
+import sys
+import os
+
+# 添加项目根目录到Python路径
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
 from gui import CrazySaturdayApp
 
 def main():

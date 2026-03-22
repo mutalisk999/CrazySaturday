@@ -160,18 +160,9 @@ class CrazySaturdayApp:
         self.players_table.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
         
-        # 删除按钮区域
-        delete_frame = tk.Frame(self.root)
-        delete_frame.pack(fill='x', padx=20, pady=5)
-        
-        delete_button = tk.Button(delete_frame, text="删除选中选手", 
-                                command=self.delete_selected_player,
-                                bg='red', fg='white', font=('Arial', 10))
-        delete_button.pack(side='left')
-        
-        # 选中提示
-        self.selection_label = tk.Label(delete_frame, text="请先选中要删除的选手", fg='gray')
-        self.selection_label.pack(side='left', padx=10)
+        # 选中提示（移动到添加选手区域）
+        self.selection_label = tk.Label(self.root, text="请先选中要删除的选手", fg='gray')
+        self.selection_label.pack(pady=5, padx=20, anchor='w')
         
         # 绑定选择事件和双击编辑事件
         self.players_table.bind('<<TreeviewSelect>>', self.on_table_select)
@@ -224,6 +215,11 @@ class CrazySaturdayApp:
         
         add_button = tk.Button(add_frame, text="添加选手", command=self.add_player)
         add_button.pack(side='left', padx=10)
+        
+        delete_button = tk.Button(add_frame, text="删除选中选手", 
+                                command=self.delete_selected_player,
+                                bg='red', fg='white', font=('Arial', 10))
+        delete_button.pack(side='left', padx=10)
         
         # 按钮区域
         button_frame = tk.Frame(self.root)
@@ -1064,7 +1060,20 @@ class CrazySaturdayApp:
         thresholds_frame = tk.Frame(self.root)
         thresholds_frame.pack(pady=10)
         
-        # 创建8个阈值输入框
+        # 添加1张球桌的阈值设置（固定为1且不可修改）
+        row_frame_1 = tk.Frame(thresholds_frame)
+        row_frame_1.pack(pady=5)
+        
+        tk.Label(row_frame_1, text="1张球桌需要大于 ", font=('Arial', 12)).pack(side=tk.LEFT)
+        
+        # 创建只读的输入框，固定为1
+        one_table_var = tk.StringVar(value="1")
+        one_table_entry = tk.Entry(row_frame_1, textvariable=one_table_var, width=10, font=('Arial', 12), state='readonly')
+        one_table_entry.pack(side=tk.LEFT, padx=5)
+        
+        tk.Label(row_frame_1, text="人", font=('Arial', 12)).pack(side=tk.LEFT)
+        
+        # 创建8个阈值输入框（2-9张球桌）
         self.threshold_vars = []
         default_thresholds = self.thresholds_manager.thresholds
         labels = [
@@ -1194,9 +1203,21 @@ class CrazySaturdayApp:
         
         tk.Label(list_frame, text="固定参赛选手列表", font=('Arial', 12, 'bold')).pack(pady=5)
         
+        # 创建带垂直滚动条的框架
+        tree_frame = tk.Frame(list_frame)
+        tree_frame.pack(fill=tk.BOTH, expand=True)
+        
         # 创建Treeview显示选手列表
         columns = ("name", "contact", "email", "address", "initial_hp")
-        self.fixed_participants_tree = ttk.Treeview(list_frame, columns=columns, show="headings", height=15)
+        self.fixed_participants_tree = ttk.Treeview(tree_frame, columns=columns, show="headings", height=8)
+        
+        # 添加垂直滚动条
+        scrollbar = ttk.Scrollbar(tree_frame, orient="vertical", command=self.fixed_participants_tree.yview)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        # 配置Treeview使用滚动条
+        self.fixed_participants_tree.configure(yscrollcommand=scrollbar.set)
+        
         self.fixed_participants_tree.heading("name", text="姓名")
         self.fixed_participants_tree.heading("contact", text="联系方式")
         self.fixed_participants_tree.heading("email", text="邮箱")
@@ -1209,7 +1230,7 @@ class CrazySaturdayApp:
         self.fixed_participants_tree.column("address", width=200)
         self.fixed_participants_tree.column("initial_hp", width=60)
         
-        self.fixed_participants_tree.pack(fill=tk.BOTH, expand=True)
+        self.fixed_participants_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         self.fixed_participants_tree.bind("<<TreeviewSelect>>", self.on_fixed_participant_select)
         
         # 右侧：编辑区域
