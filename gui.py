@@ -1170,31 +1170,31 @@ class CrazySaturdayApp:
                 # 写入表头（所有列）
                 writer.writerow(["排名", "姓名", "最大连胜", "当前连胜", "胜场数", "负场数", "胜率"])
                 
-                # 获取所有选手数据
-                active_players = [p for p in self.game.players if not p.is_eliminated()]
+                # 获取所有选手数据（包括被淘汰的）
+                all_players = self.game.players
                 
-                if active_players:
+                if all_players:
                     # 根据当前排序列进行排序
                     sort_column = getattr(self, 'streak_sort_column', '最大连胜')
                     reverse = getattr(self, 'streak_sort_reverse', True)
                     
                     if sort_column == "最大连胜":
-                        sorted_players = sorted(active_players, key=lambda p: p.max_streak, reverse=reverse)
+                        sorted_players = sorted(all_players, key=lambda p: p.max_streak, reverse=reverse)
                     elif sort_column == "当前连胜":
-                        sorted_players = sorted(active_players, key=lambda p: p.streak, reverse=reverse)
+                        sorted_players = sorted(all_players, key=lambda p: p.streak, reverse=reverse)
                     elif sort_column == "胜场数":
-                        sorted_players = sorted(active_players, key=lambda p: p.wins, reverse=reverse)
+                        sorted_players = sorted(all_players, key=lambda p: p.wins, reverse=reverse)
                     elif sort_column == "负场数":
-                        sorted_players = sorted(active_players, key=lambda p: p.losses, reverse=reverse)
+                        sorted_players = sorted(all_players, key=lambda p: p.losses, reverse=reverse)
                     elif sort_column == "胜率":
                         def get_win_rate(p):
                             total = p.wins + p.losses
                             if total == 0:
                                 return 0.0
                             return float(p.wins) / float(total)
-                        sorted_players = sorted(active_players, key=get_win_rate, reverse=reverse)
+                        sorted_players = sorted(all_players, key=get_win_rate, reverse=reverse)
                     else:
-                        sorted_players = active_players
+                        sorted_players = all_players
                     
                     # 写入数据
                     for i, p in enumerate(sorted_players):
@@ -1917,21 +1917,21 @@ class CrazySaturdayApp:
         for item in self.streak_tree_right.get_children():
             self.streak_tree_right.delete(item)
         
-        # 获取所有未被淘汰的选手
-        active_players = [p for p in self.game.players if not p.is_eliminated()]
+        # 获取所有选手（包括被淘汰的）
+        all_players = self.game.players
         
         # 根据当前排序列进行排序
         sort_column = self.streak_sort_column
         reverse = self.streak_sort_reverse
         
         if sort_column == "最大连胜":
-            sorted_players = sorted(active_players, key=lambda p: p.max_streak, reverse=reverse)
+            sorted_players = sorted(all_players, key=lambda p: p.max_streak, reverse=reverse)
         elif sort_column == "当前连胜":
-            sorted_players = sorted(active_players, key=lambda p: p.streak, reverse=reverse)
+            sorted_players = sorted(all_players, key=lambda p: p.streak, reverse=reverse)
         elif sort_column == "胜场数":
-            sorted_players = sorted(active_players, key=lambda p: p.wins, reverse=reverse)
+            sorted_players = sorted(all_players, key=lambda p: p.wins, reverse=reverse)
         elif sort_column == "负场数":
-            sorted_players = sorted(active_players, key=lambda p: p.losses, reverse=reverse)
+            sorted_players = sorted(all_players, key=lambda p: p.losses, reverse=reverse)
         elif sort_column == "胜率":
             # 使用原始胜率值进行排序，避免四舍五入导致的排序问题
             # 使用浮点数除法确保精度
@@ -1940,9 +1940,9 @@ class CrazySaturdayApp:
                 if total == 0:
                     return 0.0
                 return float(p.wins) / float(total)
-            sorted_players = sorted(active_players, key=get_win_rate, reverse=reverse)
+            sorted_players = sorted(all_players, key=get_win_rate, reverse=reverse)
         else:
-            sorted_players = active_players
+            sorted_players = all_players
         
         # 填充数据
         if sorted_players:
