@@ -39,130 +39,151 @@ class CrazySaturdayApp:
         
         self.create_setup_screen()
     
+    def _setup_styles(self):
+        """配置全局样式"""
+        style = ttk.Style()
+        
+        # 配置Treeview样式
+        style.configure("Custom.Treeview",
+                       background="white",
+                       foreground="black",
+                       rowheight=35,
+                       fieldbackground="white",
+                       font=('Microsoft YaHei', 11))
+        
+        # 配置表头样式 - 使用浅色背景+深色字体确保清晰可见
+        style.configure("Custom.Treeview.Heading",
+                       background="#e8f4f8",
+                       foreground="#1a1a1a",
+                       font=('Microsoft YaHei', 11, 'bold'),
+                       relief="raised")
+        
+        # 强制表头颜色（某些主题需要）
+        style.map("Custom.Treeview.Heading",
+                 background=[('active', '#d1e7dd'), ('pressed', '#c8e0d8')],
+                 foreground=[('active', '#000000'), ('pressed', '#000000')])
+        
+        style.map("Custom.Treeview",
+                 background=[('selected', '#3498db')],
+                 foreground=[('selected', 'white')])
+        
+        # 配置按钮样式
+        style.configure('Accent.TButton',
+                       font=('Microsoft YaHei', 11, 'bold'),
+                       padding=5)
+    
     def create_setup_screen(self):
         # 清除现有界面
         for widget in self.root.winfo_children():
             widget.destroy()
         
-        # 标题
-        title_label = tk.Label(self.root, text="疯狂星期六抢1大赛 - 选手设置", 
-                              font=('Arial', 16, 'bold'))
-        title_label.pack(pady=10)
+        # 配置全局样式
+        self._setup_styles()
         
-        # 测试模式复选框 - 使用已有的变量
-        test_mode_check = tk.Checkbutton(self.root, text="测试模式", 
+        # 标题区域 - 使用渐变背景效果
+        header_frame = tk.Frame(self.root, bg='#2c3e50', height=60)
+        header_frame.pack(fill='x')
+        header_frame.pack_propagate(False)
+        
+        title_label = tk.Label(header_frame, text="🏆 疯狂星期六抢1大赛 - 选手设置", 
+                              font=('Microsoft YaHei', 18, 'bold'),
+                              bg='#2c3e50', fg='white')
+        title_label.pack(expand=True)
+        
+        # 主内容区域
+        main_container = tk.Frame(self.root, bg='#ecf0f1')
+        main_container.pack(fill='both', expand=True, padx=15, pady=10)
+        
+        # 顶部工具栏
+        toolbar_frame = tk.Frame(main_container, bg='#ecf0f1')
+        toolbar_frame.pack(fill='x', pady=(0, 10))
+        
+        # 测试模式复选框
+        test_mode_check = tk.Checkbutton(toolbar_frame, text="🧪 测试模式",
                                         variable=self.test_mode_var,
                                         command=self.on_test_mode_change,
-                                        font=('Arial', 12))
-        test_mode_check.pack(pady=5)
+                                        font=('Microsoft YaHei', 11),
+                                        bg='#ecf0f1', activebackground='#ecf0f1')
+        test_mode_check.pack(side='left', padx=5)
+
+        # 选手列表标签
+        players_label = tk.Label(toolbar_frame, text="📋 选手列表",
+                                font=('Microsoft YaHei', 12, 'bold'),
+                                bg='#ecf0f1', fg='#2c3e50')
+        players_label.pack(side='left', padx=(20, 0))
+
+        # 功能按钮组 - 移动到选手列表右侧
+        thresholds_button = tk.Button(toolbar_frame, text="⚙️ 设定球桌阈值",
+                                     command=self.create_table_thresholds_screen,
+                                     bg='#9b59b6', fg='white',
+                                     font=('Microsoft YaHei', 10, 'bold'),
+                                     padx=10, pady=3)
+        thresholds_button.pack(side='left', padx=(20, 5))
+
+        fixed_button = tk.Button(toolbar_frame, text="👥 固定参赛选手",
+                               command=self.create_fixed_participants_screen,
+                               bg='#f39c12', fg='white',
+                               font=('Microsoft YaHei', 10, 'bold'),
+                               padx=10, pady=3)
+        fixed_button.pack(side='left', padx=5)
+
+        load_button = tk.Button(toolbar_frame, text="📂 加载历史状态",
+                               command=self.load_history_state,
+                               bg='#3498db', fg='white',
+                               font=('Microsoft YaHei', 10, 'bold'),
+                               padx=10, pady=3)
+        load_button.pack(side='left', padx=5)
+
+        # 重新开始比赛按钮
+        if len(self.game.players) >= 2:
+            start_button = tk.Button(toolbar_frame, text="🎮 重新开始比赛",
+                                   command=self.restart_game,
+                                   bg='#2ecc71', fg='white',
+                                   font=('Microsoft YaHei', 10, 'bold'),
+                                   padx=10, pady=3)
+            start_button.pack(side='left', padx=5)
+        else:
+            warning_label = tk.Label(toolbar_frame,
+                                    text="⚠️ 至少需要2名选手",
+                                    fg='#e74c3c', bg='#ecf0f1',
+                                    font=('Microsoft YaHei', 10, 'bold'))
+            warning_label.pack(side='left', padx=5)
         
-        # 选手列表 - 使用表格显示
-        players_label = tk.Label(self.root, text="选手列表:", font=('Arial', 12, 'bold'))
-        players_label.pack(anchor='w', padx=20)
-        
-        # 创建表格容器
-        players_container = tk.Frame(self.root)
-        players_container.pack(fill='both', expand=True, padx=20, pady=5)
+        # 创建表格容器 - 使用卡片式设计
+        table_card = tk.Frame(main_container, bg='white', bd=2, relief='solid',
+                             highlightbackground='#bdc3c7', highlightthickness=1)
+        table_card.pack(fill='both', expand=True, pady=5)
         
         # 创建Treeview表格
         columns = ('序号', '姓名', 'HP值')
-        self.players_table = ttk.Treeview(players_container, columns=columns, show='tree headings', height=10)
+        self.players_table = ttk.Treeview(table_card, columns=columns, show='headings', height=12)
         
         # 设置列标题
         self.players_table.heading('序号', text='序号')
         self.players_table.heading('姓名', text='姓名')
-        self.players_table.heading('HP值', text='HP')
+        self.players_table.heading('HP值', text='初始HP')
         
-        # 设置列宽度和样式 - 动态适配容器宽度
-        self.players_table.column('#0', width=0, stretch=False)  # 隐藏树形列
-        self.players_table.column('序号', width=80, anchor='center', stretch=False)  # 固定宽度
-        self.players_table.column('姓名', width=100, anchor='center', stretch=True)   # 动态宽度
-        self.players_table.column('HP值', width=80, anchor='center', stretch=True)  # 减少宽度，小点更紧凑
-        
-        # 配置表格样式 - 显示行和列分隔线
-        style = ttk.Style()
-        
-        # 创建红色边框样式
-        style.configure('Red.TLabelframe', borderwidth=3, relief='solid', bordercolor='red')
-        style.configure('Red.TLabelframe.Label', foreground='red')
-        
-        # 配置Treeview样式，显示网格线
-        style.configure("Custom.Treeview", 
-                       background="white",
-                       foreground="black",
-                       rowheight=35,  # 增加行高确保8个红心能显示
-                       fieldbackground="white")
-        
-        # 配置HP列显示红色小点
-        # 序号和姓名列保持黑色显示
-        
-        # 使用红色小点●显示HP值，序号和姓名保持黑色显示
-        # Treeview限制：无法单独设置列颜色，但红色小点本身具有颜色效果
-        
-        # 配置表头样式
-        style.configure("Custom.Treeview.Heading", 
-                       background="lightgray",
-                       foreground="black",
-                       font=('Microsoft YaHei', 11, 'bold'))
-        
-        # 配置选中状态
-        style.map("Custom.Treeview", 
-                 background=[('selected', '#0078d7')],
-                 foreground=[('selected', 'white')])
+        # 设置列宽度和样式
+        self.players_table.column('#0', width=0, stretch=False)
+        self.players_table.column('序号', width=80, anchor='center')
+        self.players_table.column('姓名', width=80, anchor='center')
+        self.players_table.column('HP值', width=180, anchor='center')
         
         # 应用自定义样式
         self.players_table.configure(style="Custom.Treeview")
         
-        # 设置表格显示选项，确保显示分隔线
-        self.players_table['show'] = 'tree headings'
-        
-        # 设置列分隔符
-        for col in columns:
-            self.players_table.column(col, anchor='center', stretch=False)
-        
-        # 使用替代方法显示网格线 - 配置单元格边框
-        style.configure("Custom.Treeview", 
-                       bordercolor="black",
-                       lightcolor="black",
-                       darkcolor="black",
-                       borderwidth=1)
-        
-        # 配置表头单元格边框
-        style.configure("Custom.Treeview.Heading", 
-                       bordercolor="black",
-                       lightcolor="black",
-                       darkcolor="black",
-                       borderwidth=1)
-        
-        # 设置表格布局以显示网格线
-        style.layout("Custom.Treeview", [
-            ('Custom.Treeview.treearea', {'sticky': 'nswe', 'border': '1'})
-        ])
-        
-        # 为每个单元格设置边框
-        for col in columns:
-            self.players_table.column(col, anchor='center', stretch=False)
-        
         # 添加滚动条
-        scrollbar = ttk.Scrollbar(players_container, orient="vertical", command=self.players_table.yview)
+        scrollbar = ttk.Scrollbar(table_card, orient="vertical", command=self.players_table.yview)
         self.players_table.configure(yscrollcommand=scrollbar.set)
         
-        # 填充表格数据 - HP值用红色小点显示
+        # 填充表格数据 - HP值显示为emoji桌球
         for i, player in enumerate(self.game.players):
-            # 将HP值转换为红色小点 - 使用更紧凑的显示
-            dots = '●' * player.initial_lives
-            self.players_table.insert('', 'end', values=(i+1, player.name, dots))
+            hp_dots = '🎱' * player.initial_lives
+            self.players_table.insert('', 'end', values=(i+1, player.name, hp_dots))
         
-        # 直接为容器添加边框，而不是创建新的框架
-        players_container.configure(borderwidth=2, relief="solid")
-        
-        # 正常打包表格和滚动条
+        # 打包表格和滚动条
         self.players_table.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
-        
-        # 选中提示（移动到添加选手区域）
-        self.selection_label = tk.Label(self.root, text="请先选中要删除的选手", fg='gray')
-        self.selection_label.pack(pady=5, padx=20, anchor='w')
         
         # 绑定选择事件和双击编辑事件
         self.players_table.bind('<<TreeviewSelect>>', self.on_table_select)
@@ -183,102 +204,107 @@ class CrazySaturdayApp:
         self.editing_item = None
         self.editing_column = None
         
-        # 添加选手区域
-        add_frame = tk.Frame(self.root)
-        add_frame.pack(fill='x', padx=20, pady=10)
+        # 添加选手区域 - 使用卡片式设计
+        add_card = tk.Frame(main_container, bg='#ecf0f1', bd=1, relief='solid')
+        add_card.pack(fill='x', pady=10, padx=5)
         
-        tk.Label(add_frame, text="添加新选手:").pack(side='left')
-        # 创建可输入的下拉框
+        # 选中提示
+        self.selection_label = tk.Label(add_card, text="💡 提示：双击表格可编辑选手信息，选中后点击删除按钮可删除", 
+                                       fg='#7f8c8d', bg='#ecf0f1',
+                                       font=('Microsoft YaHei', 10))
+        self.selection_label.pack(pady=8, padx=10, anchor='w')
+        
+        # 添加选手控件区域
+        add_controls_frame = tk.Frame(add_card, bg='#ecf0f1')
+        add_controls_frame.pack(fill='x', padx=10, pady=5)
+        
+        # 姓名输入
+        tk.Label(add_controls_frame, text="👤 姓名:", 
+                bg='#ecf0f1', font=('Microsoft YaHei', 11)).pack(side='left', padx=5)
         self.name_var = tk.StringVar()
-        self.name_combobox = ttk.Combobox(add_frame, textvariable=self.name_var, width=15)
+        self.name_combobox = ttk.Combobox(add_controls_frame, textvariable=self.name_var, width=15,
+                                         font=('Microsoft YaHei', 11))
         self.name_combobox.pack(side='left', padx=5)
-        # 填充固定参赛选手到下拉框
         self.refresh_name_combobox()
-        # 绑定选择事件
         self.name_combobox.bind('<<ComboboxSelected>>', self.on_name_selected)
         
-        tk.Label(add_frame, text="初始HP:").pack(side='left')
+        # HP选择
+        tk.Label(add_controls_frame, text="HP:", 
+                bg='#ecf0f1', font=('Microsoft YaHei', 11)).pack(side='left', padx=(15, 5))
         self.lives_var = tk.StringVar(value='4')
         
-        # 创建HP选项框 - 直接显示2-8的所有选项
-        hp_options_frame = tk.Frame(add_frame)
+        hp_options_frame = tk.Frame(add_controls_frame, bg='#ecf0f1')
         hp_options_frame.pack(side='left', padx=5)
         
-        # 创建2-8的选项按钮
         for hp_value in [2, 3, 4, 5, 6, 7, 8]:
             hp_radio = tk.Radiobutton(hp_options_frame, 
                                      text=str(hp_value),
                                      variable=self.lives_var,
                                      value=str(hp_value),
-                                     font=('Arial', 9))
-            hp_radio.pack(side='left', padx=2)
+                                     font=('Microsoft YaHei', 10),
+                                     bg='#ecf0f1', activebackground='#ecf0f1')
+            hp_radio.pack(side='left', padx=3)
         
-        add_button = tk.Button(add_frame, text="添加选手", command=self.add_player)
-        add_button.pack(side='left', padx=10)
+        # 操作按钮
+        add_button = tk.Button(add_controls_frame, text="➕ 添加选手", 
+                              command=self.add_player,
+                              bg='#27ae60', fg='white',
+                              font=('Microsoft YaHei', 10, 'bold'),
+                              padx=15, pady=3)
+        add_button.pack(side='left', padx=15)
         
-        delete_button = tk.Button(add_frame, text="删除选中选手", 
+        delete_button = tk.Button(add_controls_frame, text="🗑️ 删除选中", 
                                 command=self.delete_selected_player,
-                                bg='red', fg='white', font=('Arial', 10))
-        delete_button.pack(side='left', padx=10)
-        
-        # 按钮区域
-        button_frame = tk.Frame(self.root)
-        button_frame.pack(pady=20)
-        
-        # 设定球桌阈值按钮
-        thresholds_button = tk.Button(button_frame, text="设定球桌阈值", 
-                                     command=self.create_table_thresholds_screen,
-                                     bg='purple', fg='white', font=('Arial', 12, 'bold'))
-        thresholds_button.pack(side='left', padx=10)
-        
-        # 固定参赛选手按钮
-        fixed_button = tk.Button(button_frame, text="固定参赛选手", 
-                               command=self.create_fixed_participants_screen,
-                               bg='orange', fg='white', font=('Arial', 12, 'bold'))
-        fixed_button.pack(side='left', padx=10)
-        
-        # 加载历史状态按钮
-        load_button = tk.Button(button_frame, text="加载历史状态", 
-                               command=self.load_history_state,
-                               bg='blue', fg='white', font=('Arial', 12, 'bold'))
-        load_button.pack(side='left', padx=10)
-        
-        # 重新开始比赛按钮
-        if len(self.game.players) >= 2:
-            start_button = tk.Button(button_frame, text="重新开始比赛", 
-                                   command=self.restart_game,
-                                   bg='green', fg='white', font=('Arial', 12, 'bold'))
-            start_button.pack(side='left', padx=10)
-        else:
-            warning_label = tk.Label(button_frame, text="至少需要2名选手才能开始比赛", 
-                                    fg='red')
-            warning_label.pack(side='left')
+                                bg='#e74c3c', fg='white', 
+                                font=('Microsoft YaHei', 10, 'bold'),
+                                padx=15, pady=3)
+        delete_button.pack(side='left', padx=5)
     
     def create_game_screen(self):
         # 清除现有界面
         for widget in self.root.winfo_children():
             widget.destroy()
         
-        # 标题
-        title_label = tk.Label(self.root, text="疯狂星期六抢1大赛 - 比赛进行中", 
-                              font=('Arial', 16, 'bold'))
-        title_label.pack(pady=10)
+        # 配置全局样式
+        self._setup_styles()
+        
+        # 标题区域
+        header_frame = tk.Frame(self.root, bg='#2c3e50', height=60)
+        header_frame.pack(fill='x')
+        header_frame.pack_propagate(False)
+        
+        title_label = tk.Label(header_frame, text="🏆 疯狂星期六抢1大赛 - 比赛进行中", 
+                              font=('Microsoft YaHei', 18, 'bold'),
+                              bg='#2c3e50', fg='white')
+        title_label.pack(expand=True)
         
         # 主内容区域
-        main_frame = tk.Frame(self.root)
-        main_frame.pack(fill='both', expand=True, padx=20)
+        main_container = tk.Frame(self.root, bg='#ecf0f1')
+        main_container.pack(fill='both', expand=True, padx=10, pady=10)
         
         # 左侧：球台区域
-        left_frame = tk.Frame(main_frame)
-        left_frame.pack(side='left', fill='both', expand=True)
+        left_card = tk.Frame(main_container, bg='white', bd=2, relief='solid',
+                            highlightbackground='#bdc3c7', highlightthickness=1)
+        left_card.pack(side='left', fill='both', expand=True, padx=5, pady=5)
         
-        tables_label = tk.Label(left_frame, text="球台区域", font=('Arial', 12, 'bold'))
-        tables_label.pack(anchor='w')
+        # 球台区域标题
+        tables_header = tk.Frame(left_card, bg='#3498db', height=35)
+        tables_header.pack(fill='x')
+        tables_header.pack_propagate(False)
+        
+        tables_label = tk.Label(tables_header, text="🎱 球台区域", 
+                               font=('Microsoft YaHei', 12, 'bold'),
+                               bg='#3498db', fg='white')
+        tables_label.pack(expand=True)
+        
+        # 球台内容区域
+        left_content = tk.Frame(left_card, bg='white')
+        left_content.pack(fill='both', expand=True, padx=5, pady=5)
         
         # 球台滚动区域
-        tables_canvas = tk.Canvas(left_frame, height=400)
-        scrollbar = ttk.Scrollbar(left_frame, orient="vertical", command=tables_canvas.yview)
-        scrollable_frame = ttk.Frame(tables_canvas)
+        tables_canvas = tk.Canvas(left_content, height=400, bg='white', highlightthickness=0)
+        scrollbar = ttk.Scrollbar(left_content, orient="vertical", command=tables_canvas.yview)
+        scrollable_frame = tk.Frame(tables_canvas, bg='white')
         
         scrollable_frame.bind(
             "<Configure>",
@@ -307,112 +333,139 @@ class CrazySaturdayApp:
                 
                 # 每行开始时创建新的行框架
                 if table_count % tables_per_row == 0:
-                    row_frame = tk.Frame(scrollable_frame)
+                    row_frame = tk.Frame(scrollable_frame, bg='white')
                     row_frame.pack(fill='x', padx=5, pady=5)
                 
                 # 根据是否即将撤桌设置标题颜色
                 title_text = f"{table.table_id}号球台"
                 if is_closing_table:
-                    title_text += " (即将撤桌)"
+                    title_text += " ⚠️即将撤桌"
                 
-                table_frame = ttk.LabelFrame(row_frame, text=title_text, width=300)
+                # 球台卡片样式
+                table_card_bg = '#ffebee' if is_closing_table else '#f8f9fa'
+                table_frame = tk.Frame(row_frame, bg=table_card_bg, bd=2, relief='solid',
+                                      highlightbackground='#dee2e6', highlightthickness=1)
                 table_frame.pack(side='left', fill='both', expand=True, padx=5, pady=5)
                 
-                # 设置边框颜色
-                if is_closing_table:
-                    table_frame.configure(style='Red.TLabelframe')
+                # 球台标题栏
+                header_bg = '#e74c3c' if is_closing_table else '#34495e'
+                table_header = tk.Frame(table_frame, bg=header_bg, height=28)
+                table_header.pack(fill='x')
+                table_header.pack_propagate(False)
+                
+                table_title = tk.Label(table_header, text=title_text, 
+                                      font=('Microsoft YaHei', 11, 'bold'),
+                                      bg=header_bg, fg='white')
+                table_title.pack(expand=True)
                 
                 table_count += 1
                 
-                # 擂主区域 - 包含判负离场按钮和选手信息
-                host_frame = tk.Frame(table_frame)
-                host_frame.pack(fill='x', padx=10)
+                # 擂主区域
+                host_frame = tk.Frame(table_frame, bg=table_card_bg)
+                host_frame.pack(fill='x', padx=8, pady=4)
                 
-                # 擂主判负离场按钮 - 只有当擂主和挑战者都存在时才显示
+                # 擂主判负离场按钮
                 if table.host and table.challenger:
-                    host_button = tk.Button(host_frame, text="负", width=3, fg='blue', bg='yellow',
+                    host_button = tk.Button(host_frame, text="判负", width=5,
+                                          bg='#e74c3c', fg='white',
+                                          font=('Microsoft YaHei', 9, 'bold'),
                                           command=lambda p=table.host, tid=table.table_id: 
                                           self.eliminate_player(p, tid, "擂主"))
-                    host_button.pack(side='left', padx=(0, 5))
+                    host_button.pack(side='left', padx=(0, 8))
                 
-                # 擂主信息标签 - 分为两个标签，只有选手名字变红
-                host_label_prefix = tk.Label(host_frame, text="擂主: ", anchor='w', font=('Microsoft YaHei', 11, 'bold'))
+                host_label_prefix = tk.Label(host_frame, text="👑 擂主: ", 
+                                            bg=table_card_bg, font=('Microsoft YaHei', 11, 'bold'))
                 host_label_prefix.pack(side='left')
                 
                 if table.host:
                     host_name_text = f"{table.host.name} ({table.host.current_lives}/{table.host.initial_lives})"
-                    host_name_color = 'red' if table.host.current_lives == 1 else 'black'
+                    host_name_color = '#e74c3c' if table.host.current_lives == 1 else '#2c3e50'
                 else:
-                    host_name_text = '无'
-                    host_name_color = 'black'
+                    host_name_text = '等待中...'
+                    host_name_color = '#95a5a6'
                 
-                host_label_name = tk.Label(host_frame, text=host_name_text, fg=host_name_color, anchor='w', font=('Microsoft YaHei', 11, 'bold'))
+                host_label_name = tk.Label(host_frame, text=host_name_text, fg=host_name_color, 
+                                          bg=table_card_bg, font=('Microsoft YaHei', 11))
                 host_label_name.pack(side='left', fill='x', expand=True)
                 
-                # 挑战者区域 - 包含判负离场按钮和选手信息
-                challenger_frame = tk.Frame(table_frame)
-                challenger_frame.pack(fill='x', padx=10)
+                # 挑战者区域
+                challenger_frame = tk.Frame(table_frame, bg=table_card_bg)
+                challenger_frame.pack(fill='x', padx=8, pady=4)
                 
-                # 挑战者判负离场按钮 - 只有当擂主和挑战者都存在时才显示
+                # 挑战者判负离场按钮
                 if table.host and table.challenger:
-                    challenger_button = tk.Button(challenger_frame, text="负", width=3, fg='blue', bg='yellow',
+                    challenger_button = tk.Button(challenger_frame, text="判负", width=5,
+                                                 bg='#e74c3c', fg='white',
+                                                 font=('Microsoft YaHei', 9, 'bold'),
                                                  command=lambda p=table.challenger, tid=table.table_id: 
                                                  self.eliminate_player(p, tid, "挑战者"))
-                    challenger_button.pack(side='left', padx=(0, 5))
+                    challenger_button.pack(side='left', padx=(0, 8))
                 
-                # 挑战者信息标签 - 分为两个标签，只有选手名字变红
-                challenger_label_prefix = tk.Label(challenger_frame, text="挑战者: ", anchor='w', font=('Microsoft YaHei', 11, 'bold'))
+                challenger_label_prefix = tk.Label(challenger_frame, text="⚔️ 挑战者: ", 
+                                                  bg=table_card_bg, font=('Microsoft YaHei', 11, 'bold'))
                 challenger_label_prefix.pack(side='left')
                 
                 if table.challenger:
                     challenger_name_text = f"{table.challenger.name} ({table.challenger.current_lives}/{table.challenger.initial_lives})"
-                    challenger_name_color = 'red' if table.challenger.current_lives == 1 else 'black'
+                    challenger_name_color = '#e74c3c' if table.challenger.current_lives == 1 else '#2c3e50'
                 else:
-                    challenger_name_text = '无'
-                    challenger_name_color = 'black'
+                    challenger_name_text = '等待中...'
+                    challenger_name_color = '#95a5a6'
                 
-                challenger_label_name = tk.Label(challenger_frame, text=challenger_name_text, fg=challenger_name_color, anchor='w', font=('Microsoft YaHei', 11, 'bold'))
+                challenger_label_name = tk.Label(challenger_frame, text=challenger_name_text, 
+                                                fg=challenger_name_color, bg=table_card_bg, 
+                                                font=('Microsoft YaHei', 11))
                 challenger_label_name.pack(side='left', fill='x', expand=True)
                 
-                # 候补 - 显示详细信息（候补选手不能被淘汰）
-                waiting_frame = tk.Frame(table_frame)
-                waiting_frame.pack(fill='x', padx=10)
+                # 候补区域
+                waiting_frame = tk.Frame(table_frame, bg=table_card_bg)
+                waiting_frame.pack(fill='x', padx=8, pady=4)
                 
-                # 候补区域占位按钮（保持对齐）
-                placeholder_button = tk.Button(waiting_frame, text=" ", width=3, state='disabled', bg='yellow')
-                placeholder_button.pack(side='left', padx=(0, 5))
+                # 占位保持对齐
+                placeholder = tk.Label(waiting_frame, text="", width=5, bg=table_card_bg)
+                placeholder.pack(side='left', padx=(0, 8))
+                
+                waiting_label_prefix = tk.Label(waiting_frame, text="⏳ 候补: ", 
+                                               bg=table_card_bg, font=('Microsoft YaHei', 11, 'bold'))
+                waiting_label_prefix.pack(side='left')
                 
                 if table.waiting:
-                    # 显示候补选手姓名和HP值
-                    waiting_label = tk.Label(waiting_frame, text="候补:", anchor='w', font=('Microsoft YaHei', 11, 'bold'))
-                    waiting_label.pack(side='left')
-                    
-                    for i, player in enumerate(table.waiting):
-                        player_text = f"{player.name}({player.current_lives}/{player.initial_lives})"
-                        if i > 0:
-                            player_text = "，" + player_text
-                        
-                        # HP为1的选手显示为红色
+                    waiting_names = []
+                    for player in table.waiting:
+                        name_text = f"{player.name}({player.current_lives}/{player.initial_lives})"
                         if player.current_lives == 1:
-                            player_label = tk.Label(waiting_frame, text=player_text, anchor='w', font=('Microsoft YaHei', 11, 'bold'), fg='red')
-                        else:
-                            player_label = tk.Label(waiting_frame, text=player_text, anchor='w', font=('Microsoft YaHei', 11, 'bold'))
-                        player_label.pack(side='left')
-                        
-                        # 候补选手不能被下场，不绑定右键菜单
+                            name_text = f"{name_text}❗"
+                        waiting_names.append(name_text)
+                    
+                    waiting_text = "，".join(waiting_names)
+                    waiting_label = tk.Label(waiting_frame, text=waiting_text, 
+                                            bg=table_card_bg, font=('Microsoft YaHei', 10))
+                    waiting_label.pack(side='left', fill='x', expand=True)
                 else:
-                    waiting_label = tk.Label(waiting_frame, text="候补: 0人", anchor='w')
+                    waiting_label = tk.Label(waiting_frame, text="暂无", 
+                                            fg='#95a5a6', bg=table_card_bg, font=('Microsoft YaHei', 10))
                     waiting_label.pack(side='left', fill='x', expand=True)
         
         tables_canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
         
-        # 右侧：候补和淘汰区域 - 使用下拉菜单
-        right_frame = tk.Frame(main_frame)
-        right_frame.pack(side='right', fill='y', padx=10)
+        # 右侧：候补和淘汰区域
+        right_card = tk.Frame(main_container, bg='white', bd=2, relief='solid',
+                             highlightbackground='#bdc3c7', highlightthickness=1)
+        right_card.pack(side='right', fill='y', padx=5, pady=5)
+        
+        # 右侧标题栏
+        right_header = tk.Frame(right_card, bg='#27ae60', height=35)
+        right_header.pack(fill='x')
+        right_header.pack_propagate(False)
+        
+        right_title = tk.Label(right_header, text="📊 选手状态", 
+                              font=('Microsoft YaHei', 12, 'bold'),
+                              bg='#27ae60', fg='white')
+        right_title.pack(expand=True)
         
         # 创建Notebook（选项卡控件）
-        notebook = ttk.Notebook(right_frame, width=250)
+        notebook = ttk.Notebook(right_card, width=250)
         
         # 场外候补区选项卡
         waiting_frame = ttk.Frame(notebook)
@@ -552,8 +605,16 @@ class CrazySaturdayApp:
                                width=12)
         back_button.pack(side='left', padx=5)
         
+        # 导出 CSV 按钮
+        export_button = tk.Button(left_frame, text="📊 导出 CSV",
+                                 command=lambda: self.export_match_records_to_csv(match_tree),
+                                 bg='#27ae60', fg='white',
+                                 font=('Microsoft YaHei', 11, 'bold'),
+                                 width=10)
+        export_button.pack(side='left', padx=5)
+        
         status_label = tk.Label(left_frame, 
-                              text=f"剩余选手: {self.game.get_remaining_players_count()}",
+                              text=f"剩余选手：{self.game.get_remaining_players_count()}",
                               font=('Arial', 12))
         status_label.pack(side='left', padx=20)
         
@@ -602,39 +663,112 @@ class CrazySaturdayApp:
         for widget in self.root.winfo_children():
             widget.destroy()
         
-        # 标题
-        title_label = tk.Label(self.root, text="疯狂星期六抢1大赛 - 比赛结束", 
-                              font=('Arial', 16, 'bold'))
-        title_label.pack(pady=10)
+        # 配置全局样式
+        self._setup_styles()
         
-        # 冠军
+        # 标题区域
+        header_frame = tk.Frame(self.root, bg='#2c3e50', height=60)
+        header_frame.pack(fill='x')
+        header_frame.pack_propagate(False)
+        
+        title_label = tk.Label(header_frame, text="🏆 疯狂星期六抢1大赛 - 比赛结束", 
+                              font=('Microsoft YaHei', 18, 'bold'),
+                              bg='#2c3e50', fg='white')
+        title_label.pack(expand=True)
+        
+        # 主内容区域
+        main_container = tk.Frame(self.root, bg='#ecf0f1')
+        main_container.pack(fill='both', expand=True, padx=20, pady=15)
+        
+        # 冠军展示卡片
         if self.game.winner:
-            champion_label = tk.Label(self.root, 
-                                     text=f"🏆 冠军: {self.game.winner.name} 🏆",
-                                     font=('Arial', 14, 'bold'), fg='gold')
-            champion_label.pack(pady=10)
+            champion_card = tk.Frame(main_container, bg='#f1c40f', bd=3, relief='solid',
+                                    highlightbackground='#f39c12', highlightthickness=2)
+            champion_card.pack(fill='x', pady=10)
+            
+            champion_header = tk.Frame(champion_card, bg='#e67e22', height=40)
+            champion_header.pack(fill='x')
+            champion_header.pack_propagate(False)
+            
+            champion_title = tk.Label(champion_header, text="🎉 冠军 🎉", 
+                                     font=('Microsoft YaHei', 16, 'bold'),
+                                     bg='#e67e22', fg='white')
+            champion_title.pack(expand=True)
+            
+            champion_name = tk.Label(champion_card, 
+                                    text=f"{self.game.winner.name}",
+                                    font=('Microsoft YaHei', 24, 'bold'), 
+                                    bg='#f1c40f', fg='#c0392b')
+            champion_name.pack(pady=15)
+            
+            champion_stats = tk.Label(champion_card, 
+                                     text=f"胜 {self.game.winner.wins} 场 | 最长连胜 {self.game.winner.max_streak} 场",
+                                     font=('Microsoft YaHei', 12),
+                                     bg='#f1c40f', fg='#2c3e50')
+            champion_stats.pack(pady=5)
         
-        # 统计信息
-        stats_label = tk.Label(self.root, text="选手统计:", font=('Arial', 12, 'bold'))
-        stats_label.pack(anchor='w', padx=20)
+        # 统计信息卡片
+        stats_card = tk.Frame(main_container, bg='white', bd=2, relief='solid',
+                             highlightbackground='#bdc3c7', highlightthickness=1)
+        stats_card.pack(fill='both', expand=True, pady=10)
         
-        # 统计内容
-        stats_frame = tk.Frame(self.root)
-        stats_frame.pack(fill='both', expand=True, padx=20)
+        stats_header = tk.Frame(stats_card, bg='#9b59b6', height=35)
+        stats_header.pack(fill='x')
+        stats_header.pack_propagate(False)
         
-        # 按最长连胜排序
+        stats_title = tk.Label(stats_header, text="📊 选手统计排行", 
+                              font=('Microsoft YaHei', 12, 'bold'),
+                              bg='#9b59b6', fg='white')
+        stats_title.pack(expand=True)
+        
+        # 使用 Treeview 显示统计
+        stats_tree = ttk.Treeview(stats_card, 
+                                 columns=("排名", "姓名", "胜场", "负场", "最长连胜"),
+                                 show='headings', height=10)
+        stats_tree.heading("排名", text="排名")
+        stats_tree.heading("姓名", text="姓名")
+        stats_tree.heading("胜场", text="胜场")
+        stats_tree.heading("负场", text="负场")
+        stats_tree.heading("最长连胜", text="最长连胜")
+        
+        stats_tree.column("排名", width=60, anchor='center')
+        stats_tree.column("姓名", width=150, anchor='center')
+        stats_tree.column("胜场", width=80, anchor='center')
+        stats_tree.column("负场", width=80, anchor='center')
+        stats_tree.column("最长连胜", width=100, anchor='center')
+        
+        stats_tree.configure(style="Custom.Treeview")
+        
+        # 添加滚动条
+        stats_scrollbar = ttk.Scrollbar(stats_card, orient="vertical", command=stats_tree.yview)
+        stats_tree.configure(yscrollcommand=stats_scrollbar.set)
+        
+        stats_tree.pack(side='left', fill='both', expand=True, padx=10, pady=10)
+        stats_scrollbar.pack(side='right', fill='y', pady=10)
+        
+        # 按最长连胜排序并填充数据
         sorted_players = sorted(self.game.players, key=lambda p: p.max_streak, reverse=True)
         
-        for i, player in enumerate(sorted_players[:10]):
-            stat_text = f"{i+1}. {player.name}: 胜{player.wins}负{player.losses} 最长连胜{player.max_streak}"
-            stat_label = tk.Label(stats_frame, text=stat_text, anchor='w')
-            stat_label.pack(fill='x', padx=10)
+        for i, player in enumerate(sorted_players):
+            # 冠军使用特殊标记
+            if player == self.game.winner:
+                stats_tree.insert('', 'end', values=(f"🏆 {i+1}", player.name, player.wins, player.losses, player.max_streak),
+                                 tags=('champion',))
+            else:
+                stats_tree.insert('', 'end', values=(i+1, player.name, player.wins, player.losses, player.max_streak))
         
-        # 重新开始按钮
-        restart_button = tk.Button(self.root, text="重新开始", 
+        stats_tree.tag_configure('champion', foreground='#e67e22', font=('Microsoft YaHei', 10, 'bold'))
+        
+        # 按钮区域
+        button_frame = tk.Frame(main_container, bg='#ecf0f1')
+        button_frame.pack(fill='x', pady=15)
+        
+        restart_button = tk.Button(button_frame, text="🔄 重新开始比赛", 
                                  command=self.restart_game,
-                                 bg='green', fg='white', font=('Arial', 12, 'bold'))
-        restart_button.pack(pady=20)
+                                 bg='#27ae60', fg='white', 
+                                 font=('Microsoft YaHei', 14, 'bold'),
+                                 padx=30, pady=10)
+        restart_button.pack(expand=True)
     
     def on_table_select(self, event):
         """表格选择事件处理"""
@@ -681,6 +815,11 @@ class CrazySaturdayApp:
     
     def on_double_click(self, event):
         """双击编辑事件处理"""
+        # 如果正在编辑，先保存当前编辑
+        if self.editing_entry:
+            # 保存当前编辑但不刷新界面
+            self.save_current_edit()
+        
         # 获取点击的位置
         region = self.players_table.identify_region(event.x, event.y)
         if region not in ['cell', 'tree']:
@@ -703,22 +842,95 @@ class CrazySaturdayApp:
         # 开始编辑
         self.start_editing(item, column)
     
+    def save_current_edit(self):
+        """保存当前编辑但不刷新界面"""
+        if not self.editing_entry:
+            return
+        
+        new_value = self.editing_entry.get().strip()
+        
+        # 获取编辑信息
+        item = self.editing_item
+        column = self.editing_column
+        
+        # 清理编辑状态
+        self.cleanup_editing()
+        
+        # 验证和更新数据
+        if item and column:
+            self.validate_and_update_cell(item, column, new_value)
+    
+    def validate_and_update_cell(self, item, column, new_value):
+        """验证并更新单元格数据（不刷新整个界面）"""
+        # 获取选手索引
+        values = self.players_table.item(item, 'values')
+        try:
+            player_index = int(values[0]) - 1
+        except (ValueError, IndexError):
+            return False
+        
+        if player_index < 0 or player_index >= len(self.game.players):
+            return False
+        
+        player = self.game.players[player_index]
+        
+        if column == '#2':  # 姓名列
+            # 验证姓名
+            if not new_value:
+                self.show_error("姓名不能为空！")
+                return False
+            
+            # 验证姓名首字符
+            first_char = new_value[0]
+            if not (('\u4e00' <= first_char <= '\u9fff') or
+                    ('A' <= first_char <= 'Z') or
+                    ('a' <= first_char <= 'z')):
+                self.show_error("姓名首字符必须是中文或大小写字母！")
+                return False
+            
+            # 检查姓名重复
+            for i, p in enumerate(self.game.players):
+                if i != player_index and p.name == new_value:
+                    self.show_error(f"选手'{new_value}'已存在！")
+                    return False
+            
+            # 更新姓名
+            player.name = new_value
+            # 只更新该单元格显示
+            self.players_table.item(item, values=(values[0], new_value, values[2]))
+            return True
+            
+        elif column == '#3':  # HP值列
+            # 验证HP值
+            try:
+                hp_value = int(new_value)
+                if hp_value < 2 or hp_value > 8:
+                    self.show_error("HP值必须在2-8之间！")
+                    return False
+            except ValueError:
+                self.show_error("HP值必须是数字！")
+                return False
+            
+            # 更新HP值
+            player.initial_lives = hp_value
+            player.current_lives = hp_value
+            # 只更新该单元格显示 - 显示emoji桌球
+            hp_dots = '🎱' * hp_value
+            self.players_table.item(item, values=(values[0], values[1], hp_dots))
+            return True
+        
+        return False
+    
     def start_editing(self, item, column):
         """开始编辑单元格"""
-        # 清除之前的编辑状态
-        if self.editing_entry:
-            self.finish_editing()
-        
         # 获取当前值
         values = self.players_table.item(item, 'values')
         if column == '#2':  # 姓名列
             current_value = values[1]
         elif column == '#3':  # HP值列
-            # HP值列显示红色小点，但编辑时需要显示原始数值
-            # 从小点字符串推断原始HP值
+            # HP值列显示emoji桌球，编辑时需要显示数值
             dots_text = values[2]
-            # 计算小点数量（每个●占1个字符）
-            hp_value = len(dots_text)  # 每个●是1个字符
+            hp_value = len(dots_text)  # 计算emoji数量
             current_value = str(hp_value)
         else:
             return
@@ -727,6 +939,10 @@ class CrazySaturdayApp:
         bbox = self.players_table.bbox(item, column)
         if not bbox:
             return
+        
+        # 保存编辑状态
+        self.editing_item = item
+        self.editing_column = column
         
         # 创建编辑框
         self.editing_entry = tk.Entry(self.players_table, 
@@ -741,10 +957,6 @@ class CrazySaturdayApp:
         self.editing_entry.bind('<Return>', lambda e: self.finish_editing())
         self.editing_entry.bind('<FocusOut>', lambda e: self.finish_editing())
         self.editing_entry.bind('<Escape>', lambda e: self.cancel_editing())
-        
-        # 保存编辑状态
-        self.editing_item = item
-        self.editing_column = column
     
     def finish_editing(self):
         """完成编辑"""
@@ -753,16 +965,16 @@ class CrazySaturdayApp:
         
         new_value = self.editing_entry.get().strip()
         
-        # 先清理编辑状态，避免界面刷新时的冲突
+        # 验证和更新数据（在清理编辑状态之前）
+        success = self.validate_and_update(new_value)
+        
+        # 清理编辑状态
         self.cleanup_editing()
         
-        # 验证和更新数据
-        if self.validate_and_update(new_value):
+        # 根据验证结果刷新界面
+        if success:
             # 更新成功，刷新界面
             self.create_setup_screen()
-        else:
-            # 验证失败，不需要刷新界面，数据保持不变
-            pass
     
     def cancel_editing(self):
         """取消编辑"""
@@ -786,7 +998,10 @@ class CrazySaturdayApp:
         
         # 获取选手索引
         values = self.players_table.item(self.editing_item, 'values')
-        player_index = values[0] - 1
+        try:
+            player_index = int(values[0]) - 1
+        except (ValueError, IndexError):
+            return False
         
         if player_index < 0 or player_index >= len(self.game.players):
             return False
@@ -848,6 +1063,61 @@ class CrazySaturdayApp:
         error_label.pack(pady=20)
         
         ok_button = tk.Button(error_window, text="确定", command=error_window.destroy)
+        ok_button.pack(pady=10)
+    
+    def export_match_records_to_csv(self, match_tree):
+        """导出比赛对局详情到 CSV"""
+        import csv
+        from datetime import datetime
+        
+        # 获取所有对局记录
+        match_records = getattr(self.game, 'match_records', [])
+        
+        # 生成文件名
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"比赛对局详情_{timestamp}.csv"
+        
+        try:
+            with open(filename, 'w', newline='', encoding='utf-8-sig') as f:
+                writer = csv.writer(f)
+                
+                # 写入表头
+                writer.writerow(["桌号", "时间", "胜者", "负者"])
+                
+                # 写入数据
+                if match_records:
+                    # 按桌号和时间分组，每两条记录为一局比赛
+                    for i in range(0, len(match_records), 2):
+                        if i + 1 < len(match_records):
+                            winner_record = match_records[i]
+                            loser_record = match_records[i + 1]
+                            time_str = winner_record.start_time.strftime("%Y-%m-%d %H:%M:%S")
+                            writer.writerow([
+                                winner_record.table_id,
+                                time_str,
+                                winner_record.player_name,
+                                loser_record.player_name
+                            ])
+                else:
+                    writer.writerow(["", "", "暂无对局记录", ""])
+            
+            self.show_info(f"成功导出到：{filename}")
+        except Exception as e:
+            self.show_error(f"导出失败：{str(e)}")
+    
+    def show_info(self, message):
+        """显示信息提示"""
+        info_window = tk.Toplevel(self.root)
+        info_window.title("信息")
+        info_window.geometry("300x100")
+        info_window.transient(self.root)
+        info_window.grab_set()
+        
+        info_label = tk.Label(info_window, text=message, 
+                             fg='green', font=('Arial', 10))
+        info_label.pack(pady=20)
+        
+        ok_button = tk.Button(info_window, text="确定", command=info_window.destroy)
         ok_button.pack(pady=10)
     
     def add_player(self):
@@ -935,18 +1205,18 @@ class CrazySaturdayApp:
         # 获取鼠标位置对应的行和列
         item = self.players_table.identify_row(event.y)
         column = self.players_table.identify_column(event.x)
-        
+
         # 只有在HP列才显示提示
         if item and column == '#3':  # HP值列
             # 获取该行的数据
             values = self.players_table.item(item, 'values')
             if values and len(values) >= 3:
-                # 计算HP值（小点数量）
+                # 计算HP值（emoji桌球数量）
                 dots_text = values[2]
                 hp_value = len(dots_text)
-                
+
                 # 显示工具提示
-                self.show_tooltip(event.x_root, event.y_root, f"HP: {hp_value}")
+                self.show_tooltip(event.x_root, event.y_root, f"初始HP: {hp_value}")
         else:
             # 隐藏工具提示
             self.hide_tooltip()
@@ -1102,7 +1372,7 @@ class CrazySaturdayApp:
         # 填充表格数据 - HP值用红色小点显示
         for i, player in enumerate(self.game.players):
             # 将HP值转换为红色小点 - 使用更紧凑的显示
-            dots = '●' * player.initial_lives
+            dots = '🎱' * player.initial_lives
             self.players_table.insert('', 'end', values=(i+1, player.name, dots))
     
     def restart_game(self):
@@ -1141,86 +1411,151 @@ class CrazySaturdayApp:
         # 清除现有界面
         for widget in self.root.winfo_children():
             widget.destroy()
-        
-        # 标题
-        title_label = tk.Label(self.root, text="设定球桌阈值", 
-                              font=('Arial', 16, 'bold'))
-        title_label.pack(pady=10)
-        
+
+        # 配置全局样式
+        self._setup_styles()
+
+        # 标题区域 - 使用渐变背景效果
+        header_frame = tk.Frame(self.root, bg='#2c3e50', height=60)
+        header_frame.pack(fill='x')
+        header_frame.pack_propagate(False)
+
+        title_label = tk.Label(header_frame, text="⚙️ 设定球桌阈值",
+                              font=('Microsoft YaHei', 18, 'bold'),
+                              bg='#2c3e50', fg='white')
+        title_label.pack(expand=True)
+
+        # 主内容区域
+        main_container = tk.Frame(self.root, bg='#ecf0f1')
+        main_container.pack(fill='both', expand=True, padx=15, pady=10)
+
+        # 顶部工具栏
+        toolbar_frame = tk.Frame(main_container, bg='#ecf0f1')
+        toolbar_frame.pack(fill='x', pady=(0, 10))
+
         # 返回按钮
-        back_button = tk.Button(self.root, text="返回主界面", 
+        back_button = tk.Button(toolbar_frame, text="⬅️ 返回主界面",
                                 command=self.create_setup_screen,
-                                font=('Arial', 12), width=15)
-        back_button.pack(pady=10)
-        
-        # 说明文字
-        info_frame = tk.Frame(self.root)
-        info_frame.pack(pady=10)
-        
-        tk.Label(info_frame, text="说明：修改阈值后，game_states.json 历史状态文件将被删除！", 
-                fg='red', font=('Arial', 12, 'bold')).pack()
-        
-        # 阈值输入区域
-        thresholds_frame = tk.Frame(self.root)
-        thresholds_frame.pack(pady=10)
-        
+                                bg='#7f8c8d', fg='white',
+                                font=('Microsoft YaHei', 11, 'bold'),
+                                padx=15, pady=5)
+        back_button.pack(side='left', padx=5)
+
+        # 说明文字 - 使用警告卡片
+        warning_card = tk.Frame(main_container, bg='#fff3cd', bd=2, relief='solid',
+                               highlightbackground='#ffc107', highlightthickness=1)
+        warning_card.pack(fill='x', pady=10, padx=5)
+
+        warning_icon = tk.Label(warning_card, text="⚠️", bg='#fff3cd',
+                               font=('Microsoft YaHei', 16))
+        warning_icon.pack(side='left', padx=10)
+
+        tk.Label(warning_card, text="说明：修改阈值后，game_states.json 历史状态文件将被删除！",
+                fg='#856404', bg='#fff3cd',
+                font=('Microsoft YaHei', 11, 'bold')).pack(side='left', pady=10)
+
+        # 阈值输入区域 - 使用卡片式设计
+        thresholds_card = tk.Frame(main_container, bg='white', bd=2, relief='solid',
+                                  highlightbackground='#bdc3c7', highlightthickness=1)
+        thresholds_card.pack(fill='both', expand=True, pady=10, padx=5)
+
+        # 卡片标题
+        thresholds_header = tk.Frame(thresholds_card, bg='#9b59b6', height=40)
+        thresholds_header.pack(fill='x')
+        thresholds_header.pack_propagate(False)
+
+        tk.Label(thresholds_header, text="📊 球桌人数阈值设置",
+                font=('Microsoft YaHei', 13, 'bold'),
+                bg='#9b59b6', fg='white').pack(expand=True)
+
+        # 阈值输入内容区
+        thresholds_content = tk.Frame(thresholds_card, bg='white')
+        thresholds_content.pack(fill='both', expand=True, padx=20, pady=15)
+
         # 添加1张球桌的阈值设置（固定为1且不可修改）
-        row_frame_1 = tk.Frame(thresholds_frame)
-        row_frame_1.pack(pady=5)
-        
-        tk.Label(row_frame_1, text="1张球桌需要大于 ", font=('Arial', 12)).pack(side=tk.LEFT)
-        
+        row_frame_1 = tk.Frame(thresholds_content, bg='white')
+        row_frame_1.pack(fill='x', pady=6)
+
+        tk.Label(row_frame_1, text="1张球桌需要大于", font=('Microsoft YaHei', 12),
+                bg='white', fg='#2c3e50').pack(side=tk.LEFT)
+
         # 创建只读的输入框，固定为1
         one_table_var = tk.StringVar(value="1")
-        one_table_entry = tk.Entry(row_frame_1, textvariable=one_table_var, width=10, font=('Arial', 12), state='readonly')
-        one_table_entry.pack(side=tk.LEFT, padx=5)
-        
-        tk.Label(row_frame_1, text="人", font=('Arial', 12)).pack(side=tk.LEFT)
-        
+        one_table_entry = tk.Entry(row_frame_1, textvariable=one_table_var, width=8,
+                                   font=('Microsoft YaHei', 12, 'bold'),
+                                   state='readonly', justify='center',
+                                   readonlybackground='#e8f4f8', fg='#0d47a1')
+        one_table_entry.pack(side=tk.LEFT, padx=10)
+
+        tk.Label(row_frame_1, text="人", font=('Microsoft YaHei', 12),
+                bg='white', fg='#2c3e50').pack(side=tk.LEFT)
+
+        # 分隔线
+        separator = tk.Frame(thresholds_content, bg='#bdc3c7', height=2)
+        separator.pack(fill='x', pady=10)
+
         # 创建8个阈值输入框（2-9张球桌）
         self.threshold_vars = []
         default_thresholds = self.thresholds_manager.thresholds
-        labels = [
-            "2张球桌需要大于 ",
-            "3张球桌需要大于 ",
-            "4张球桌需要大于 ",
-            "5张球桌需要大于 ",
-            "6张球桌需要大于 ",
-            "7张球桌需要大于 ",
-            "8张球桌需要大于 ",
-            "9张球桌需要大于 "
-        ]
-        
+
+        # 使用两列布局
+        input_frame = tk.Frame(thresholds_content, bg='white')
+        input_frame.pack(fill='both', expand=True)
+
         for i in range(8):
-            row_frame = tk.Frame(thresholds_frame)
-            row_frame.pack(pady=5)
-            
-            tk.Label(row_frame, text=labels[i], font=('Arial', 12)).pack(side=tk.LEFT)
-            
+            # 左列 (0-3) 和 右列 (4-7)
+            if i < 4:
+                col = 0
+                row = i
+            else:
+                col = 1
+                row = i - 4
+
+            row_frame = tk.Frame(input_frame, bg='white')
+            row_frame.grid(row=row, column=col, sticky='w', pady=8, padx=20)
+
+            # 球桌图标和数量
+            table_icon = tk.Label(row_frame, text="🎱", bg='white', font=('Microsoft YaHei', 14))
+            table_icon.pack(side=tk.LEFT, padx=(0, 5))
+
+            tk.Label(row_frame, text=f"{i+2}张球桌需要大于",
+                    font=('Microsoft YaHei', 12), bg='white', fg='#2c3e50').pack(side=tk.LEFT)
+
             var = tk.StringVar(value=str(default_thresholds[i]))
             self.threshold_vars.append(var)
-            
+
             # 绑定回调函数，当值变化时联动更新后面的值
             var.trace_add('write', lambda name, index, mode, idx=i: self.on_threshold_change(idx))
-            
-            entry = tk.Entry(row_frame, textvariable=var, width=10, font=('Arial', 12))
-            entry.pack(side=tk.LEFT, padx=5)
-            
-            tk.Label(row_frame, text="人", font=('Arial', 12)).pack(side=tk.LEFT)
-        
-        # 按钮区域
-        button_frame = tk.Frame(self.root)
-        button_frame.pack(pady=20)
-        
-        save_button = tk.Button(button_frame, text="保存阈值", 
+
+            entry = tk.Entry(row_frame, textvariable=var, width=8,
+                            font=('Microsoft YaHei', 12, 'bold'),
+                            justify='center', bd=2, relief='solid',
+                            highlightbackground='#3498db', highlightthickness=1)
+            entry.pack(side=tk.LEFT, padx=10)
+
+            tk.Label(row_frame, text="人", font=('Microsoft YaHei', 12),
+                    bg='white', fg='#2c3e50').pack(side=tk.LEFT)
+
+        # 按钮区域 - 使用卡片式设计
+        button_card = tk.Frame(main_container, bg='#ecf0f1')
+        button_card.pack(fill='x', pady=15)
+
+        button_frame = tk.Frame(button_card, bg='#ecf0f1')
+        button_frame.pack()
+
+        save_button = tk.Button(button_frame, text="💾 保存阈值",
                                command=self.save_table_thresholds,
-                               bg='green', fg='white', font=('Arial', 12, 'bold'), width=12)
-        save_button.pack(side=tk.LEFT, padx=10)
-        
-        reset_button = tk.Button(button_frame, text="恢复默认", 
+                               bg='#27ae60', fg='white',
+                               font=('Microsoft YaHei', 12, 'bold'),
+                               padx=30, pady=10)
+        save_button.pack(side=tk.LEFT, padx=15)
+
+        reset_button = tk.Button(button_frame, text="🔄 恢复默认",
                                 command=self.reset_table_thresholds,
-                                bg='orange', fg='white', font=('Arial', 12, 'bold'), width=12)
-        reset_button.pack(side=tk.LEFT, padx=10)
+                                bg='#e67e22', fg='white',
+                                font=('Microsoft YaHei', 12, 'bold'),
+                                padx=30, pady=10)
+        reset_button.pack(side=tk.LEFT, padx=15)
     
     def on_threshold_change(self, changed_index):
         """当某个阈值被修改时，联动更新后面的值"""
@@ -1285,124 +1620,183 @@ class CrazySaturdayApp:
         # 清除现有界面
         for widget in self.root.winfo_children():
             widget.destroy()
-        
-        # 标题
-        title_label = tk.Label(self.root, text="固定参赛选手管理", 
-                              font=('Arial', 16, 'bold'))
-        title_label.pack(pady=10)
-        
+
+        # 配置全局样式
+        self._setup_styles()
+
+        # 标题区域 - 使用渐变背景效果
+        header_frame = tk.Frame(self.root, bg='#2c3e50', height=60)
+        header_frame.pack(fill='x')
+        header_frame.pack_propagate(False)
+
+        title_label = tk.Label(header_frame, text="👥 固定参赛选手管理",
+                              font=('Microsoft YaHei', 18, 'bold'),
+                              bg='#2c3e50', fg='white')
+        title_label.pack(expand=True)
+
+        # 主内容区域
+        main_container = tk.Frame(self.root, bg='#ecf0f1')
+        main_container.pack(fill='both', expand=True, padx=15, pady=10)
+
+        # 顶部工具栏
+        toolbar_frame = tk.Frame(main_container, bg='#ecf0f1')
+        toolbar_frame.pack(fill='x', pady=(0, 10))
+
         # 返回按钮
-        back_button = tk.Button(self.root, text="返回主界面", 
+        back_button = tk.Button(toolbar_frame, text="⬅️ 返回主界面",
                                 command=self.create_setup_screen,
-                                font=('Arial', 12), width=15)
-        back_button.pack(pady=10)
-        
-        # 主框架
-        main_frame = tk.Frame(self.root)
-        main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-        
-        # 左侧：选手列表
-        list_frame = tk.Frame(main_frame)
-        list_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=5)
-        
-        tk.Label(list_frame, text="固定参赛选手列表", font=('Arial', 12, 'bold')).pack(pady=5)
-        
+                                bg='#7f8c8d', fg='white',
+                                font=('Microsoft YaHei', 11, 'bold'),
+                                padx=15, pady=5)
+        back_button.pack(side='left', padx=5)
+
+        # 主框架 - 左右分栏
+        main_frame = tk.Frame(main_container, bg='#ecf0f1')
+        main_frame.pack(fill=tk.BOTH, expand=True)
+
+        # 左侧：选手列表 - 使用卡片式设计
+        list_card = tk.Frame(main_frame, bg='white', bd=2, relief='solid',
+                            highlightbackground='#bdc3c7', highlightthickness=1)
+        list_card.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=5)
+
+        # 列表标题
+        list_header = tk.Frame(list_card, bg='#3498db', height=35)
+        list_header.pack(fill='x')
+        list_header.pack_propagate(False)
+
+        tk.Label(list_header, text="📋 固定参赛选手列表",
+                font=('Microsoft YaHei', 12, 'bold'),
+                bg='#3498db', fg='white').pack(expand=True)
+
         # 创建带垂直滚动条的框架
-        tree_frame = tk.Frame(list_frame)
-        tree_frame.pack(fill=tk.BOTH, expand=True)
-        
+        tree_frame = tk.Frame(list_card, bg='white')
+        tree_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+
         # 创建Treeview显示选手列表
         columns = ("name", "contact", "email", "address", "initial_hp")
-        self.fixed_participants_tree = ttk.Treeview(tree_frame, columns=columns, show="headings", height=8)
-        
+        self.fixed_participants_tree = ttk.Treeview(tree_frame, columns=columns, show="headings", height=10)
+        self.fixed_participants_tree.configure(style="Custom.Treeview")
+
         # 添加垂直滚动条
         scrollbar = ttk.Scrollbar(tree_frame, orient="vertical", command=self.fixed_participants_tree.yview)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        
+
         # 配置Treeview使用滚动条
         self.fixed_participants_tree.configure(yscrollcommand=scrollbar.set)
-        
+
         self.fixed_participants_tree.heading("name", text="姓名")
         self.fixed_participants_tree.heading("contact", text="联系方式")
         self.fixed_participants_tree.heading("email", text="邮箱")
         self.fixed_participants_tree.heading("address", text="家庭住址")
         self.fixed_participants_tree.heading("initial_hp", text="初始HP")
-        
-        self.fixed_participants_tree.column("name", width=100)
-        self.fixed_participants_tree.column("contact", width=120)
-        self.fixed_participants_tree.column("email", width=150)
-        self.fixed_participants_tree.column("address", width=200)
-        self.fixed_participants_tree.column("initial_hp", width=60)
-        
+
+        self.fixed_participants_tree.column("name", width=100, anchor='center')
+        self.fixed_participants_tree.column("contact", width=120, anchor='center')
+        self.fixed_participants_tree.column("email", width=150, anchor='center')
+        self.fixed_participants_tree.column("address", width=180, anchor='center')
+        self.fixed_participants_tree.column("initial_hp", width=60, anchor='center')
+
         self.fixed_participants_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         self.fixed_participants_tree.bind("<<TreeviewSelect>>", self.on_fixed_participant_select)
-        
-        # 右侧：编辑区域
-        edit_frame = tk.Frame(main_frame)
-        edit_frame.pack(side=tk.RIGHT, fill=tk.BOTH, padx=5)
-        
-        tk.Label(edit_frame, text="选手信息编辑", font=('Arial', 12, 'bold')).pack(pady=5)
-        
+
+        # 右侧：编辑区域 - 使用卡片式设计
+        edit_card = tk.Frame(main_frame, bg='white', bd=2, relief='solid',
+                            highlightbackground='#bdc3c7', highlightthickness=1)
+        edit_card.pack(side=tk.RIGHT, fill=tk.BOTH, padx=5)
+
+        # 编辑区域标题
+        edit_header = tk.Frame(edit_card, bg='#e67e22', height=35)
+        edit_header.pack(fill='x')
+        edit_header.pack_propagate(False)
+
+        tk.Label(edit_header, text="✏️ 选手信息编辑",
+                font=('Microsoft YaHei', 12, 'bold'),
+                bg='#e67e22', fg='white').pack(expand=True)
+
         # 表单框架
-        form_frame = tk.Frame(edit_frame)
-        form_frame.pack(pady=10)
-        
+        form_frame = tk.Frame(edit_card, bg='white')
+        form_frame.pack(pady=15, padx=15, fill='x')
+
         # 姓名
-        name_label_frame = tk.Frame(form_frame)
-        name_label_frame.grid(row=0, column=0, sticky=tk.E, pady=5)
-        tk.Label(name_label_frame, text="姓名").pack(side=tk.LEFT)
-        tk.Label(name_label_frame, text="*", fg="red").pack(side=tk.LEFT)
-        tk.Label(name_label_frame, text=":").pack(side=tk.LEFT)
+        name_label_frame = tk.Frame(form_frame, bg='white')
+        name_label_frame.grid(row=0, column=0, sticky=tk.E, pady=8)
+        tk.Label(name_label_frame, text="姓名", bg='white', font=('Microsoft YaHei', 11)).pack(side=tk.LEFT)
+        tk.Label(name_label_frame, text="*", fg="#e74c3c", bg='white', font=('Microsoft YaHei', 11, 'bold')).pack(side=tk.LEFT)
+        tk.Label(name_label_frame, text=":", bg='white', font=('Microsoft YaHei', 11)).pack(side=tk.LEFT)
         self.fp_name_var = tk.StringVar()
-        tk.Entry(form_frame, textvariable=self.fp_name_var, width=25).grid(row=0, column=1, pady=5)
-        
+        tk.Entry(form_frame, textvariable=self.fp_name_var, width=22,
+                font=('Microsoft YaHei', 11), bd=2, relief='solid').grid(row=0, column=1, pady=8, padx=5)
+
         # 联系方式
-        contact_label_frame = tk.Frame(form_frame)
-        contact_label_frame.grid(row=1, column=0, sticky=tk.E, pady=5)
-        tk.Label(contact_label_frame, text="联系方式").pack(side=tk.LEFT)
-        tk.Label(contact_label_frame, text="*", fg="red").pack(side=tk.LEFT)
-        tk.Label(contact_label_frame, text=":").pack(side=tk.LEFT)
+        contact_label_frame = tk.Frame(form_frame, bg='white')
+        contact_label_frame.grid(row=1, column=0, sticky=tk.E, pady=8)
+        tk.Label(contact_label_frame, text="联系方式", bg='white', font=('Microsoft YaHei', 11)).pack(side=tk.LEFT)
+        tk.Label(contact_label_frame, text="*", fg="#e74c3c", bg='white', font=('Microsoft YaHei', 11, 'bold')).pack(side=tk.LEFT)
+        tk.Label(contact_label_frame, text=":", bg='white', font=('Microsoft YaHei', 11)).pack(side=tk.LEFT)
         self.fp_contact_var = tk.StringVar()
-        tk.Entry(form_frame, textvariable=self.fp_contact_var, width=25).grid(row=1, column=1, pady=5)
-        
+        tk.Entry(form_frame, textvariable=self.fp_contact_var, width=22,
+                font=('Microsoft YaHei', 11), bd=2, relief='solid').grid(row=1, column=1, pady=8, padx=5)
+
         # 邮箱
-        tk.Label(form_frame, text="邮箱:").grid(row=2, column=0, sticky=tk.E, pady=5)
+        tk.Label(form_frame, text="邮箱:", bg='white', font=('Microsoft YaHei', 11)).grid(row=2, column=0, sticky=tk.E, pady=8)
         self.fp_email_var = tk.StringVar()
-        tk.Entry(form_frame, textvariable=self.fp_email_var, width=25).grid(row=2, column=1, pady=5)
-        
+        tk.Entry(form_frame, textvariable=self.fp_email_var, width=22,
+                font=('Microsoft YaHei', 11), bd=2, relief='solid').grid(row=2, column=1, pady=8, padx=5)
+
         # 家庭住址
-        tk.Label(form_frame, text="家庭住址:").grid(row=3, column=0, sticky=tk.E, pady=5)
+        tk.Label(form_frame, text="家庭住址:", bg='white', font=('Microsoft YaHei', 11)).grid(row=3, column=0, sticky=tk.E, pady=8)
         self.fp_address_var = tk.StringVar()
-        tk.Entry(form_frame, textvariable=self.fp_address_var, width=25).grid(row=3, column=1, pady=5)
-        
+        tk.Entry(form_frame, textvariable=self.fp_address_var, width=22,
+                font=('Microsoft YaHei', 11), bd=2, relief='solid').grid(row=3, column=1, pady=8, padx=5)
+
         # 初始HP
-        hp_label_frame = tk.Frame(form_frame)
-        hp_label_frame.grid(row=4, column=0, sticky=tk.E, pady=5)
-        tk.Label(hp_label_frame, text="初始HP").pack(side=tk.LEFT)
-        tk.Label(hp_label_frame, text="*", fg="red").pack(side=tk.LEFT)
-        tk.Label(hp_label_frame, text=":").pack(side=tk.LEFT)
+        hp_label_frame = tk.Frame(form_frame, bg='white')
+        hp_label_frame.grid(row=4, column=0, sticky=tk.E, pady=8)
+        tk.Label(hp_label_frame, text="初始HP", bg='white', font=('Microsoft YaHei', 11)).pack(side=tk.LEFT)
+        tk.Label(hp_label_frame, text="*", fg="#e74c3c", bg='white', font=('Microsoft YaHei', 11, 'bold')).pack(side=tk.LEFT)
+        tk.Label(hp_label_frame, text=":", bg='white', font=('Microsoft YaHei', 11)).pack(side=tk.LEFT)
         self.fp_hp_var = tk.IntVar(value=2)
-        hp_frame = tk.Frame(form_frame)
-        hp_frame.grid(row=4, column=1, sticky=tk.W, pady=5)
+        hp_frame = tk.Frame(form_frame, bg='white')
+        hp_frame.grid(row=4, column=1, sticky=tk.W, pady=8)
         for hp in range(2, 9):
-            tk.Radiobutton(hp_frame, text=str(hp), variable=self.fp_hp_var, value=hp).pack(side=tk.LEFT)
-        
+            tk.Radiobutton(hp_frame, text=str(hp), variable=self.fp_hp_var, value=hp,
+                          bg='white', font=('Microsoft YaHei', 10)).pack(side=tk.LEFT, padx=2)
+
         # 按钮区域
-        button_frame = tk.Frame(edit_frame)
-        button_frame.pack(pady=20)
-        
-        tk.Button(button_frame, text="添加选手", command=self.add_fixed_participant, 
-                 width=12).grid(row=0, column=0, padx=5, pady=5)
-        tk.Button(button_frame, text="修改选手", command=self.update_fixed_participant, 
-                 width=12).grid(row=0, column=1, padx=5, pady=5)
-        tk.Button(button_frame, text="删除选手", command=self.delete_fixed_participant, 
-                 width=12).grid(row=0, column=2, padx=5, pady=5)
-        tk.Button(button_frame, text="清空表单", command=self.clear_fixed_participant_form, 
-                 width=12).grid(row=1, column=0, columnspan=3, pady=5)
-        
+        button_frame = tk.Frame(edit_card, bg='white')
+        button_frame.pack(pady=15, padx=15, fill='x')
+
+        # 按钮区域 - 统一大小和布局
+        btn_row1 = tk.Frame(button_frame, bg='white')
+        btn_row1.pack(fill='x', pady=5)
+
+        add_btn = tk.Button(btn_row1, text="➕ 添加选手", command=self.add_fixed_participant,
+                 bg='#27ae60', fg='white', font=('Microsoft YaHei', 10, 'bold'),
+                 width=12, height=2)
+        add_btn.pack(side='left', expand=True, padx=5, pady=3)
+
+        update_btn = tk.Button(btn_row1, text="✏️ 修改选手", command=self.update_fixed_participant,
+                 bg='#3498db', fg='white', font=('Microsoft YaHei', 10, 'bold'),
+                 width=12, height=2)
+        update_btn.pack(side='left', expand=True, padx=5, pady=3)
+
+        # 第二行按钮
+        btn_row2 = tk.Frame(button_frame, bg='white')
+        btn_row2.pack(fill='x', pady=5)
+
+        delete_btn = tk.Button(btn_row2, text="🗑️ 删除选手", command=self.delete_fixed_participant,
+                 bg='#e74c3c', fg='white', font=('Microsoft YaHei', 10, 'bold'),
+                 width=12, height=2)
+        delete_btn.pack(side='left', expand=True, padx=5, pady=3)
+
+        clear_btn = tk.Button(btn_row2, text="🔄 清空表单", command=self.clear_fixed_participant_form,
+                 bg='#95a5a6', fg='white', font=('Microsoft YaHei', 10, 'bold'),
+                 width=12, height=2)
+        clear_btn.pack(side='left', expand=True, padx=5, pady=3)
+
         # 当前选中的选手
         self.current_selected_fixed_participant = None
-        
+
         # 刷新选手列表
         self.refresh_fixed_participants_list()
     
