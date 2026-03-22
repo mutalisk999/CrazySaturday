@@ -418,32 +418,121 @@ class CrazySaturdayApp:
         waiting_frame = ttk.Frame(notebook)
         notebook.add(waiting_frame, text="场外候补区")
         
-        waiting_text = scrolledtext.ScrolledText(waiting_frame, width=28, height=10, font=('Microsoft YaHei', 11, 'bold'))
-        waiting_text.pack(fill='both', expand=True, padx=5, pady=5)
+        # 使用 Treeview 显示场外候补选手
+        waiting_tree = ttk.Treeview(waiting_frame, columns=("姓名", "HP"), show='headings', height=10)
+        waiting_tree.heading("姓名", text="姓名")
+        waiting_tree.heading("HP", text="HP")
+        waiting_tree.column("姓名", width=120, anchor='center')
+        waiting_tree.column("HP", width=80, anchor='center')
+        
+        # 添加滚动条
+        waiting_scrollbar = ttk.Scrollbar(waiting_frame, orient="vertical", command=waiting_tree.yview)
+        waiting_tree.configure(yscrollcommand=waiting_scrollbar.set)
+        
+        waiting_tree.pack(side='left', fill='both', expand=True, padx=5, pady=5)
+        waiting_scrollbar.pack(side='right', fill='y', pady=5)
         
         # 插入场外候补选手，HP为1的显示为红色
         if self.game.outside_waiting:
             for p in self.game.outside_waiting:
+                hp_text = f"{p.current_lives}/{p.initial_lives}"
+                # HP为1的选手显示为红色
                 if p.current_lives == 1:
-                    # HP为1的选手显示为红色
-                    waiting_text.insert('end', f"{p.name} ({p.current_lives}/{p.initial_lives})\n", 'red')
+                    waiting_tree.insert('', 'end', values=(p.name, hp_text), tags=('red_hp',))
                 else:
-                    waiting_text.insert('end', f"{p.name} ({p.current_lives}/{p.initial_lives})\n")
-            waiting_text.tag_config('red', foreground='red')
+                    waiting_tree.insert('', 'end', values=(p.name, hp_text))
+            waiting_tree.tag_configure('red_hp', foreground='red')
         else:
-            waiting_text.insert('1.0', "暂无选手")
-        waiting_text.config(state='disabled')
+            waiting_tree.insert('', 'end', values=("暂无选手", ""))
         
         # 已淘汰选手区选项卡
         eliminated_frame = ttk.Frame(notebook)
         notebook.add(eliminated_frame, text="已淘汰选手区")
         
-        eliminated_text = scrolledtext.ScrolledText(eliminated_frame, width=28, height=10, font=('Microsoft YaHei', 11, 'bold'))
-        eliminated_text.pack(fill='both', expand=True, padx=5, pady=5)
+        # 使用 Treeview 显示已淘汰选手
+        eliminated_tree = ttk.Treeview(eliminated_frame, columns=("姓名",), show='headings', height=10)
+        eliminated_tree.heading("姓名", text="姓名")
+        eliminated_tree.column("姓名", width=200, anchor='center')
         
-        eliminated_players = [p.name for p in self.game.eliminated]
-        eliminated_text.insert('1.0', '\n'.join(eliminated_players) if eliminated_players else "暂无选手")
-        eliminated_text.config(state='disabled')
+        # 添加滚动条
+        eliminated_scrollbar = ttk.Scrollbar(eliminated_frame, orient="vertical", command=eliminated_tree.yview)
+        eliminated_tree.configure(yscrollcommand=eliminated_scrollbar.set)
+        
+        eliminated_tree.pack(side='left', fill='both', expand=True, padx=5, pady=5)
+        eliminated_scrollbar.pack(side='right', fill='y', pady=5)
+        
+        if self.game.eliminated:
+            for p in self.game.eliminated:
+                eliminated_tree.insert('', 'end', values=(p.name,))
+        else:
+            eliminated_tree.insert('', 'end', values=("暂无选手",))
+        
+        # 连胜统计排行选项卡
+        streak_frame = ttk.Frame(notebook)
+        notebook.add(streak_frame, text="连胜统计排行")
+        
+        # 使用 Treeview 显示连胜统计
+        streak_tree = ttk.Treeview(streak_frame, columns=("排名", "姓名", "最大连胜", "当前连胜"), show='headings', height=10)
+        streak_tree.heading("排名", text="排名")
+        streak_tree.heading("姓名", text="姓名")
+        streak_tree.heading("最大连胜", text="最大连胜")
+        streak_tree.heading("当前连胜", text="当前连胜")
+        streak_tree.column("排名", width=60, anchor='center')
+        streak_tree.column("姓名", width=100, anchor='center')
+        streak_tree.column("最大连胜", width=80, anchor='center')
+        streak_tree.column("当前连胜", width=80, anchor='center')
+        
+        # 添加滚动条
+        streak_scrollbar = ttk.Scrollbar(streak_frame, orient="vertical", command=streak_tree.yview)
+        streak_tree.configure(yscrollcommand=streak_scrollbar.set)
+        
+        streak_tree.pack(side='left', fill='both', expand=True, padx=5, pady=5)
+        streak_scrollbar.pack(side='right', fill='y', pady=5)
+        
+        # 按最大连赢数排序选手
+        active_players = [p for p in self.game.players if not p.is_eliminated()]
+        sorted_by_streak = sorted(active_players, key=lambda p: p.max_streak, reverse=True)
+        
+        if sorted_by_streak:
+            for i, p in enumerate(sorted_by_streak):
+                streak_tree.insert('', 'end', values=(i+1, p.name, p.max_streak, p.streak))
+        else:
+            streak_tree.insert('', 'end', values=("", "暂无选手", "", ""))
+        
+        # 比赛对局详情信息选项卡
+        match_details_frame = ttk.Frame(notebook)
+        notebook.add(match_details_frame, text="比赛对局详情信息")
+        
+        # 使用 Treeview 显示对局详情
+        match_tree = ttk.Treeview(match_details_frame, columns=("桌号", "时间", "胜者", "负者"), show='headings', height=10)
+        match_tree.heading("桌号", text="桌号")
+        match_tree.heading("时间", text="时间")
+        match_tree.heading("胜者", text="胜者")
+        match_tree.heading("负者", text="负者")
+        match_tree.column("桌号", width=60, anchor='center')
+        match_tree.column("时间", width=80, anchor='center')
+        match_tree.column("胜者", width=100, anchor='center')
+        match_tree.column("负者", width=100, anchor='center')
+        
+        # 添加滚动条
+        match_scrollbar = ttk.Scrollbar(match_details_frame, orient="vertical", command=match_tree.yview)
+        match_tree.configure(yscrollcommand=match_scrollbar.set)
+        
+        match_tree.pack(side='left', fill='both', expand=True, padx=5, pady=5)
+        match_scrollbar.pack(side='right', fill='y', pady=5)
+        
+        # 显示对局详情 - 一行显示一局比赛
+        match_records = getattr(self.game, 'match_records', [])
+        if match_records:
+            # 将记录按桌号和时间分组，每两条记录为一局比赛
+            for i in range(0, len(match_records), 2):
+                if i + 1 < len(match_records):
+                    winner_record = match_records[i]
+                    loser_record = match_records[i + 1]
+                    time_str = winner_record.start_time.strftime("%H:%M:%S")
+                    match_tree.insert('', 'end', values=(winner_record.table_id, time_str, winner_record.player_name, loser_record.player_name))
+        else:
+            match_tree.insert('', 'end', values=("", "", "暂无对局记录", ""))
         
         notebook.pack(fill='both', expand=True, pady=5)
         
@@ -451,7 +540,19 @@ class CrazySaturdayApp:
         bottom_frame = tk.Frame(self.root)
         bottom_frame.pack(fill='x', pady=10)
         
-        status_label = tk.Label(bottom_frame, 
+        # 左侧：回到主界面按钮和状态标签
+        left_frame = tk.Frame(bottom_frame)
+        left_frame.pack(side='left', padx=20)
+        
+        # 回到主界面按钮
+        back_button = tk.Button(left_frame, text="回到主界面",
+                               command=self.create_setup_screen,
+                               bg='orange', fg='white',
+                               font=('Microsoft YaHei', 11, 'bold'),
+                               width=12)
+        back_button.pack(side='left', padx=5)
+        
+        status_label = tk.Label(left_frame, 
                               text=f"剩余选手: {self.game.get_remaining_players_count()}",
                               font=('Arial', 12))
         status_label.pack(side='left', padx=20)
@@ -918,9 +1019,12 @@ class CrazySaturdayApp:
             return
         
         print("DEBUG: 用户确认了判负离场操作")
+        print(f"DEBUG: self.game 对象 id: {id(self.game)}")
+        print(f"DEBUG: self.game.eliminate_player 方法: {self.game.eliminate_player}")
         
         # 执行离场逻辑
         success = self.game.eliminate_player(player, table_id)
+        print(f"DEBUG: eliminate_player 返回: {success}")
         
         if success:
             print("DEBUG: 判负离场逻辑执行成功")
