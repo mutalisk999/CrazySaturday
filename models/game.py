@@ -1,8 +1,21 @@
 import random
+import datetime
 from typing import List, Dict, Optional
 from models.player import Player
 from models.table import Table
 from models.table_thresholds import TableThresholdsManager
+
+class MatchRecord:
+    def __init__(self, table_id: int, player_name: str, role: str, result: str, start_time: datetime.datetime, end_time: datetime.datetime):
+        self.table_id = table_id
+        self.player_name = player_name
+        self.role = role  # "擂主" or "挑战者"
+        self.result = result  # "胜者" or "失败者"
+        self.start_time = start_time
+        self.end_time = end_time
+    
+    def duration(self) -> int:
+        return int((self.end_time - self.start_time).total_seconds())
 
 class Game:
     def __init__(self, thresholds_manager=None):
@@ -34,6 +47,9 @@ class Game:
         self.state_history = []  # 状态历史记录
         self.current_state_index = -1  # 当前状态索引
         self.max_states = 10000  # 最大状态记录数量
+        
+        # 比赛记录
+        self.match_records = []
     
     def calculate_required_tables(self, player_count: int) -> int:
         """根据选手数量计算需要的球台数量"""
@@ -417,6 +433,29 @@ class Game:
                 self.leftover_tables_queue.remove(table.table_id)
             
             print(f"特殊场景：{table.table_id}号球台被标记为撤桌且候补为空，胜利者 {winner.name} 一起离场")
+    
+    def record_match(self, table, winner, loser, start_time, end_time):
+        """记录比赛结果"""
+        # 确定胜者和败者的角色
+        winner_role = "擂主" if table.host == winner else "挑战者"
+        loser_role = "擂主" if table.host == loser else "挑战者"
+        
+        self.match_records.append(MatchRecord(
+            table_id=table.table_id,
+            player_name=winner.name,
+            role=winner_role,
+            result="胜者",
+            start_time=start_time,
+            end_time=end_time
+        ))
+        self.match_records.append(MatchRecord(
+            table_id=table.table_id,
+            player_name=loser.name,
+            role=loser_role,
+            result="失败者",
+            start_time=start_time,
+            end_time=end_time
+        ))
         
         # 场外候补区第一个成为球台候补
         # 如果球台被标记为即将撤桌（在tables_to_close或closing_tables中），不再安排候补
@@ -444,12 +483,31 @@ class Game:
         if not table:
             return False
         
-        # HP减1
-        player.current_lives -= 1
+        # 确定胜利者和失败者
+        loser = player
+        winner = None
         
-        # 记录选手的原始位置
         was_host = (table.host == player)
         was_challenger = (table.challenger == player)
+        
+        if was_challenger:
+            winner = table.host
+        elif was_host:
+            winner = table.challenger
+        
+        # 更新连胜记录
+        if winner:
+            winner.win_match()
+        loser.lose_match()
+        
+        # 记录比赛详情
+        if winner:
+            start_time = datetime.datetime.now() - datetime.timedelta(minutes=5)
+            end_time = datetime.datetime.now()
+            self.record_match(table, winner, loser, start_time, end_time)
+        
+        # HP减1
+        player.current_lives -= 1
         
         # 根据HP值决定移动位置
         if player.current_lives <= 0:
@@ -523,12 +581,7 @@ class Game:
                 table.challenger = new_challenger
                 new_challenger.position = f"{table.table_id}号台挑战者"
                 new_challenger.table_id = table.table_id
-            # 如果挑战者不为空，从场外候补区补充候补者
-            elif len(table.waiting) < 1:
-                new_waiting = self.outside_waiting.pop(0)
-                table.waiting.append(new_waiting)
-                new_waiting.position = f"{table.table_id}号台候补"
-                new_waiting.table_id = table.table_id
+            # 注意：不在这里补充候补，让 fill_leftover_tables 统一处理
     
     def adjust_table_positions_after_challenger_elimination(self, table):
         """挑战者被淘汰后调整球台位置"""
@@ -539,16 +592,7 @@ class Game:
             table.challenger = table.waiting.pop(0)
             table.challenger.position = f"{table.table_id}号台挑战者"
             table.challenger.table_id = table.table_id  # 确保设置table_id
-            
-            # 如果候补区有选手补位成挑战者，从场外候补区补充候补选手
-            # 如果球台被标记为即将撤桌（在tables_to_close或closing_tables中），不再安排候补
-            if (table.table_id not in self.tables_to_close and \
-                table.table_id not in self.closing_tables and \
-                self.outside_waiting and table.active):
-                new_waiting = self.outside_waiting.pop(0)
-                table.waiting.append(new_waiting)
-                new_waiting.position = f"{table.table_id}号台候补"
-                new_waiting.table_id = table.table_id
+            # 注意：不在这里补充候补，让 fill_leftover_tables 统一处理
         else:
             # 如果候补区为空，尝试从场外候补区补充挑战者
             # 如果球台被标记为即将撤桌（在tables_to_close或closing_tables中），不再安排候补
@@ -558,13 +602,7 @@ class Game:
                 table.challenger = self.outside_waiting.pop(0)
                 table.challenger.position = f"{table.table_id}号台挑战者"
                 table.challenger.table_id = table.table_id
-                
-                # 如果场外候补区还有更多选手，补充候补选手
-                if self.outside_waiting and table.active:
-                    new_waiting = self.outside_waiting.pop(0)
-                    table.waiting.append(new_waiting)
-                    new_waiting.position = f"{table.table_id}号台候补"
-                    new_waiting.table_id = table.table_id
+                # 注意：不在这里补充候补，让 fill_leftover_tables 统一处理
             else:
                 table.challenger = None
     
@@ -763,7 +801,8 @@ class Game:
             "winner": self.winner.name if self.winner else None,
             "tables_to_close": self.tables_to_close.copy(),
             "closing_tables": {k: True for k in self.closing_tables.keys()},  # 只保存table_id
-            "leftover_tables_queue": self.leftover_tables_queue.copy()
+            "leftover_tables_queue": self.leftover_tables_queue.copy(),
+            "match_records": self._deep_copy_match_records()
         }
         
         # 如果当前不是在最新状态，删除之后的所有状态
@@ -810,6 +849,12 @@ class Game:
             if table:
                 self.closing_tables[table_id] = table
         self.leftover_tables_queue = state["leftover_tables_queue"].copy()
+        
+        # 恢复比赛记录
+        if "match_records" in state:
+            self.match_records = self._deep_copy_match_records_from_dict(state["match_records"])
+        else:
+            self.match_records = []
         
         self.current_state_index = state_index
         
@@ -864,6 +909,34 @@ class Game:
     def _deep_copy_player_list(self, player_list):
         """深拷贝选手名称列表"""
         return [p.name for p in player_list]
+    
+    def _deep_copy_match_records(self):
+        """深拷贝比赛记录"""
+        return [{
+            "table_id": record.table_id,
+            "player_name": record.player_name,
+            "role": record.role,
+            "result": record.result,
+            "start_time": record.start_time.isoformat(),
+            "end_time": record.end_time.isoformat()
+        } for record in self.match_records]
+    
+    def _deep_copy_match_records_from_dict(self, match_records_dict):
+        """从字典恢复比赛记录"""
+        records = []
+        for data in match_records_dict:
+            start_time = datetime.datetime.fromisoformat(data["start_time"])
+            end_time = datetime.datetime.fromisoformat(data["end_time"])
+            record = MatchRecord(
+                data["table_id"],
+                data["player_name"],
+                data["role"],
+                data["result"],
+                start_time,
+                end_time
+            )
+            records.append(record)
+        return records
     
     def _deep_copy_players_from_dict(self, players_dict):
         """从字典恢复选手列表"""
@@ -943,7 +1016,8 @@ class Game:
                 "winner": state["winner"],
                 "tables_to_close": state["tables_to_close"],
                 "closing_tables": state["closing_tables"],
-                "leftover_tables_queue": state["leftover_tables_queue"]
+                "leftover_tables_queue": state["leftover_tables_queue"],
+                "match_records": state.get("match_records", [])
             }
             states_data.append(state_data)
         
