@@ -50,6 +50,9 @@ class Game:
         
         # 比赛记录
         self.match_records = []
+        
+        # 初始球台数量（默认9张）
+        self.initial_table_count = 9
     
     def calculate_required_tables(self, player_count: int) -> int:
         """根据选手数量计算需要的球台数量"""
@@ -74,12 +77,15 @@ class Game:
         else:
             return 9
     
-    def setup_tables(self, player_count: int):
-        # 根据人数确定球台数量
-        table_count = 1
-        for threshold, count in sorted(self.table_thresholds.items()):
-            if player_count >= threshold:
-                table_count = count
+    def setup_tables(self, table_count: int = None):
+        if table_count is None:
+            table_count = self.initial_table_count
+        
+        # 确保球台数量在合理范围内
+        table_count = max(1, min(9, table_count))
+        
+        # 保存初始球台数量
+        self.initial_table_count = table_count
         
         # 创建球台
         self.tables = []
@@ -105,11 +111,15 @@ class Game:
             return self.players.pop(index)
         return None
     
-    def start_game(self):
+    def start_game(self, initial_table_count: int = None):
         if len(self.players) < 2:
             return False
         
-        self.setup_tables(len(self.players))
+        # 设置初始球台数量
+        if initial_table_count is not None:
+            self.initial_table_count = initial_table_count
+        
+        self.setup_tables(self.initial_table_count)
         
         # 随机分配选手到球台区和场外候补区
         random.shuffle(self.players)
@@ -162,34 +172,54 @@ class Game:
         return "\n".join(players_info) if players_info else "无选手"
     
     def check_table_reduction(self):
-        """检查是否需要减少球台"""
-        remaining_players = self.get_remaining_players_count()
-        
-        # 先清理已关闭的球台标记
+        """检查是否需要减少球台（已禁用自动减桌，仅清理已关闭的球台标记）"""
+        # 只清理已关闭的球台标记，不再自动标记需要关闭的球台
         self.cleanup_closed_tables()
+    
+    def manual_close_table(self, table_id: int) -> bool:
+        """手动标记球台进入撤台状态
         
-        # 清理后再计算当前球台数
-        current_tables = self.get_active_tables_count()
-        required_tables = self.calculate_required_tables(remaining_players)
+        Args:
+            table_id: 球台编号
+            
+        Returns:
+            bool: 是否成功标记
+        """
+        # 检查球台是否存在
+        table = self.get_table_by_id(table_id)
+        if not table:
+            print(f"DEBUG: 球台 {table_id} 不存在")
+            return False
         
-        print(f"DEBUG: 减桌检查 - 剩余选手: {remaining_players}, 当前球台: {current_tables}, 需要球台: {required_tables}")
-        print(f"DEBUG: tables_to_close: {list(self.tables_to_close.keys())}, closing_tables: {list(self.closing_tables.keys())}")
+        # 检查球台是否活跃
+        if not table.active:
+            print(f"DEBUG: 球台 {table_id} 已不活跃")
+            return False
         
-        if current_tables > required_tables:
-            # 需要减少球台
-            tables_to_close_count = current_tables - required_tables
-            # 计算还需要标记多少个球台（排除已标记的）
-            already_marked = len(self.tables_to_close)
-            still_needed = max(0, tables_to_close_count - already_marked)
-            print(f"DEBUG: 需要减少 {tables_to_close_count} 张球台，已标记 {already_marked} 张，还需标记 {still_needed} 张")
-            if still_needed > 0:
-                self.identify_tables_to_close(still_needed)
+        # 检查球台是否已被标记
+        if table_id in self.tables_to_close:
+            print(f"DEBUG: 球台 {table_id} 已被标记为撤台")
+            return False
+        
+        # 检查是否只剩最后一张活跃球台
+        active_tables_count = self.get_active_tables_count()
+        if active_tables_count <= 1:
+            print(f"DEBUG: 只剩 {active_tables_count} 张活跃球台，不能撤台")
+            return False
+        
+        # 标记球台进入撤台状态
+        self.tables_to_close[table_id] = True
+        self.closing_tables[table_id] = table
+        print(f"DEBUG: 球台 {table_id} 已标记为撤台")
+        
+        # 检查球台是否可以立即关闭
+        if self.can_close_table_immediately(table):
+            print(f"DEBUG: 球台 {table_id} 可以立即关闭")
+            self.close_table_immediately(table)
         else:
-            # 如果不需要减桌，清理所有减桌标记
-            if self.tables_to_close:
-                print(f"DEBUG: 当前球台数({current_tables}) <= 需要球台数({required_tables})，清理所有减桌标记")
-                self.tables_to_close.clear()
-                self.closing_tables.clear()
+            print(f"DEBUG: 球台 {table_id} 需要等待当前比赛结束")
+        
+        return True
     
     def identify_tables_to_close(self, count: int):
         """标识需要关闭的球台"""
@@ -802,7 +832,8 @@ class Game:
             "tables_to_close": self.tables_to_close.copy(),
             "closing_tables": {k: True for k in self.closing_tables.keys()},  # 只保存table_id
             "leftover_tables_queue": self.leftover_tables_queue.copy(),
-            "match_records": self._deep_copy_match_records()
+            "match_records": self._deep_copy_match_records(),
+            "initial_table_count": self.initial_table_count
         }
         
         # 如果当前不是在最新状态，删除之后的所有状态
@@ -855,6 +886,12 @@ class Game:
             self.match_records = self._deep_copy_match_records_from_dict(state["match_records"])
         else:
             self.match_records = []
+        
+        # 恢复初始球台数量
+        if "initial_table_count" in state:
+            self.initial_table_count = state["initial_table_count"]
+        else:
+            self.initial_table_count = 9  # 默认值
         
         self.current_state_index = state_index
         
@@ -1017,7 +1054,8 @@ class Game:
                 "tables_to_close": state["tables_to_close"],
                 "closing_tables": state["closing_tables"],
                 "leftover_tables_queue": state["leftover_tables_queue"],
-                "match_records": state.get("match_records", [])
+                "match_records": state.get("match_records", []),
+                "initial_table_count": state.get("initial_table_count", 9)
             }
             states_data.append(state_data)
         
