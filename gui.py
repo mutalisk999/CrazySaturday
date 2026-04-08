@@ -43,7 +43,7 @@ class CrazySaturdayApp:
         """配置全局样式"""
         style = ttk.Style()
         
-        # 配置Treeview样式
+        # 配置Treeview样式（主界面使用）
         style.configure("Custom.Treeview",
                        background="white",
                        foreground="black",
@@ -64,6 +64,29 @@ class CrazySaturdayApp:
                  foreground=[('active', '#000000'), ('pressed', '#000000')])
         
         style.map("Custom.Treeview",
+                 background=[('selected', '#3498db')],
+                 foreground=[('selected', 'white')])
+        
+        # 配置大字体Treeview样式（比赛界面右侧使用）
+        style.configure("Large.Treeview",
+                       background="white",
+                       foreground="black",
+                       rowheight=40,
+                       fieldbackground="white",
+                       font=('Microsoft YaHei', 14))
+        
+        # 配置大字体表头样式
+        style.configure("Large.Treeview.Heading",
+                       background="#e8f4f8",
+                       foreground="#1a1a1a",
+                       font=('Microsoft YaHei', 12, 'bold'),
+                       relief="raised")
+        
+        style.map("Large.Treeview.Heading",
+                 background=[('active', '#d1e7dd'), ('pressed', '#c8e0d8')],
+                 foreground=[('active', '#000000'), ('pressed', '#000000')])
+        
+        style.map("Large.Treeview",
                  background=[('selected', '#3498db')],
                  foreground=[('selected', 'white')])
         
@@ -113,19 +136,12 @@ class CrazySaturdayApp:
         players_label.pack(side='left', padx=(20, 0))
 
         # 功能按钮组 - 移动到选手列表右侧
-        thresholds_button = tk.Button(toolbar_frame, text="⚙️ 设定球桌阈值",
-                                     command=self.create_table_thresholds_screen,
-                                     bg='#9b59b6', fg='white',
-                                     font=('Microsoft YaHei', 10, 'bold'),
-                                     padx=10, pady=3)
-        thresholds_button.pack(side='left', padx=(20, 5))
-
         fixed_button = tk.Button(toolbar_frame, text="👥 固定参赛选手",
                                command=self.create_fixed_participants_screen,
                                bg='#f39c12', fg='white',
                                font=('Microsoft YaHei', 10, 'bold'),
                                padx=10, pady=3)
-        fixed_button.pack(side='left', padx=5)
+        fixed_button.pack(side='left', padx=(20, 5))
 
         load_button = tk.Button(toolbar_frame, text="📂 加载历史状态",
                                command=self.load_history_state,
@@ -302,7 +318,7 @@ class CrazySaturdayApp:
         left_content.pack(fill='both', expand=True, padx=5, pady=5)
         
         # 球台滚动区域
-        tables_canvas = tk.Canvas(left_content, height=400, bg='white', highlightthickness=0)
+        tables_canvas = tk.Canvas(left_content, height=320, bg='white', highlightthickness=0)
         scrollbar = ttk.Scrollbar(left_content, orient="vertical", command=tables_canvas.yview)
         scrollable_frame = tk.Frame(tables_canvas, bg='white')
         
@@ -353,10 +369,30 @@ class CrazySaturdayApp:
                 table_header.pack(fill='x')
                 table_header.pack_propagate(False)
                 
+                # 球台标题
                 table_title = tk.Label(table_header, text=title_text, 
                                       font=('Microsoft YaHei', 11, 'bold'),
                                       bg=header_bg, fg='white')
-                table_title.pack(expand=True)
+                table_title.pack(side='left', padx=(10, 0))
+                
+                # 撤台按钮
+                if is_closing_table:
+                    # 已标记为撤台，显示禁用按钮
+                    close_button = tk.Button(table_header, text="已标记撤台",
+                                           bg='#95a5a6', fg='white',
+                                           font=('Microsoft YaHei', 8, 'bold'),
+                                           state='disabled',
+                                           padx=5, pady=1)
+                    close_button.pack(side='right', padx=5, pady=3)
+                else:
+                    # 未标记撤台，显示可点击按钮
+                    close_button = tk.Button(table_header, text="撤台",
+                                           bg='#e67e22', fg='white',
+                                           font=('Microsoft YaHei', 8, 'bold'),
+                                           activebackground='#d35400',
+                                           padx=8, pady=1,
+                                           command=lambda tid=table.table_id: self.manual_close_table(tid))
+                    close_button.pack(side='right', padx=5, pady=3)
                 
                 table_count += 1
                 
@@ -385,7 +421,7 @@ class CrazySaturdayApp:
                     host_name_color = '#95a5a6'
                 
                 host_label_name = tk.Label(host_frame, text=host_name_text, fg=host_name_color, 
-                                          bg=table_card_bg, font=('Microsoft YaHei', 11))
+                                          bg=table_card_bg, font=('Microsoft YaHei', 14))
                 host_label_name.pack(side='left', fill='x', expand=True)
                 
                 # 挑战者区域
@@ -414,7 +450,7 @@ class CrazySaturdayApp:
                 
                 challenger_label_name = tk.Label(challenger_frame, text=challenger_name_text, 
                                                 fg=challenger_name_color, bg=table_card_bg, 
-                                                font=('Microsoft YaHei', 11))
+                                                font=('Microsoft YaHei', 14))
                 challenger_label_name.pack(side='left', fill='x', expand=True)
                 
                 # 候补区域
@@ -439,11 +475,11 @@ class CrazySaturdayApp:
                     
                     waiting_text = "，".join(waiting_names)
                     waiting_label = tk.Label(waiting_frame, text=waiting_text, 
-                                            bg=table_card_bg, font=('Microsoft YaHei', 10))
+                                            bg=table_card_bg, font=('Microsoft YaHei', 13))
                     waiting_label.pack(side='left', fill='x', expand=True)
                 else:
                     waiting_label = tk.Label(waiting_frame, text="暂无", 
-                                            fg='#95a5a6', bg=table_card_bg, font=('Microsoft YaHei', 10))
+                                            fg='#95a5a6', bg=table_card_bg, font=('Microsoft YaHei', 13))
                     waiting_label.pack(side='left', fill='x', expand=True)
         
         tables_canvas.pack(side="left", fill="both", expand=True)
@@ -472,7 +508,8 @@ class CrazySaturdayApp:
         notebook.add(waiting_frame, text="场外候补区")
         
         # 使用 Treeview 显示场外候补选手
-        waiting_tree = ttk.Treeview(waiting_frame, columns=("姓名", "HP"), show='headings', height=10)
+        waiting_tree = ttk.Treeview(waiting_frame, columns=("姓名", "HP"), show='headings', height=7,
+                                    style="Large.Treeview")
         waiting_tree.heading("姓名", text="姓名")
         waiting_tree.heading("HP", text="HP")
         waiting_tree.column("姓名", width=180, anchor='center')
@@ -503,7 +540,8 @@ class CrazySaturdayApp:
         notebook.add(eliminated_frame, text="已淘汰选手区")
         
         # 使用 Treeview 显示已淘汰选手
-        eliminated_tree = ttk.Treeview(eliminated_frame, columns=("姓名",), show='headings', height=10)
+        eliminated_tree = ttk.Treeview(eliminated_frame, columns=("姓名",), show='headings', height=7,
+                                       style="Large.Treeview")
         eliminated_tree.heading("姓名", text="姓名")
         eliminated_tree.column("姓名", width=280, anchor='center')
         
@@ -536,7 +574,8 @@ class CrazySaturdayApp:
         left_frame = tk.Frame(tree_container)
         left_frame.pack(side='left', fill='y')
         
-        self.streak_tree_left = ttk.Treeview(left_frame, columns=("排名", "姓名"), show='headings', height=10)
+        self.streak_tree_left = ttk.Treeview(left_frame, columns=("排名", "姓名"), show='headings', height=7,
+                                             style="Large.Treeview")
         self.streak_tree_left.heading("排名", text="排名")
         self.streak_tree_left.heading("姓名", text="姓名")
         self.streak_tree_left.column("排名", width=50, anchor='center')
@@ -550,7 +589,8 @@ class CrazySaturdayApp:
         right_frame = tk.Frame(right_container)
         right_frame.pack(side='left', fill='both', expand=True)
         
-        self.streak_tree_right = ttk.Treeview(right_frame, columns=("最大连胜", "当前连胜", "胜场数", "负场数", "胜率"), show='headings', height=10)
+        self.streak_tree_right = ttk.Treeview(right_frame, columns=("最大连胜", "当前连胜", "胜场数", "负场数", "胜率"), show='headings', height=7,
+                                              style="Large.Treeview")
         self.streak_tree_right.heading("最大连胜", text="最大连胜")
         self.streak_tree_right.heading("当前连胜", text="当前连胜")
         self.streak_tree_right.heading("胜场数", text="胜场数")
@@ -598,7 +638,8 @@ class CrazySaturdayApp:
         self.update_streak_stats()
         
         # 使用 Treeview 显示对局详情
-        match_tree = ttk.Treeview(match_details_frame, columns=("桌号", "时间", "胜者", "负者"), show='headings', height=10)
+        match_tree = ttk.Treeview(match_details_frame, columns=("桌号", "时间", "胜者", "负者"), show='headings', height=7,
+                                  style="Large.Treeview")
         match_tree.heading("桌号", text="桌号")
         match_tree.heading("时间", text="时间")
         match_tree.heading("胜者", text="胜者")
@@ -1472,6 +1513,48 @@ class CrazySaturdayApp:
         # 重新创建整个界面
         self.create_setup_screen()
     
+    def manual_close_table(self, table_id: int):
+        """手动标记球台撤台
+        
+        Args:
+            table_id: 球台编号
+        """
+        # 检查是否只剩最后一张活跃球台
+        active_tables_count = self.game.get_active_tables_count()
+        if active_tables_count <= 1:
+            messagebox.showwarning("无法撤台", "只剩最后一张活跃球台，不能撤台！")
+            return
+        
+        # 获取球台信息
+        table = self.game.get_table_by_id(table_id)
+        if not table:
+            messagebox.showerror("错误", f"球台 {table_id} 不存在！")
+            return
+        
+        # 确认对话框
+        players_info = self.game.get_table_players_info(table)
+        confirm = messagebox.askyesno(
+            "确认撤台",
+            f"确定要撤掉 {table_id} 号球台吗？\n\n"
+            f"该球台当前状态：\n{players_info}\n\n"
+            f"撤台后，该球台的选手将移至场外候补区。"
+        )
+        
+        if not confirm:
+            return
+        
+        # 执行撤台操作
+        success = self.game.manual_close_table(table_id)
+        
+        if success:
+            # 保存状态
+            self.game.save_state(f"{table_id}号台手动撤台")
+            # 刷新界面
+            self.create_game_screen()
+            messagebox.showinfo("撤台成功", f"{table_id} 号球台已标记为撤台！")
+        else:
+            messagebox.showerror("撤台失败", "撤台操作失败，请重试！")
+    
     def update_players_table(self):
         """更新选手表格内容"""
         # 清空表格
@@ -1484,9 +1567,108 @@ class CrazySaturdayApp:
             dots = '🎱' * player.initial_lives
             self.players_table.insert('', 'end', values=(i+1, player.name, dots))
     
+    def show_table_count_dialog(self):
+        """显示球桌数量选择对话框
+        
+        Returns:
+            int or None: 用户选择的球台数量，如果取消则返回None
+        """
+        dialog = tk.Toplevel(self.root)
+        dialog.title("选择初始球台数量")
+        dialog.geometry("450x350")
+        dialog.transient(self.root)
+        dialog.grab_set()
+        
+        # 居中显示
+        dialog.update_idletasks()
+        x = (dialog.winfo_screenwidth() - dialog.winfo_width()) // 2
+        y = (dialog.winfo_screenheight() - dialog.winfo_height()) // 2
+        dialog.geometry(f"+{x}+{y}")
+        
+        # 主框架
+        main_frame = tk.Frame(dialog, bg='#ecf0f1', padx=20, pady=20)
+        main_frame.pack(fill='both', expand=True)
+        
+        # 标题
+        title_label = tk.Label(main_frame, text="🎱 请选择初始使用的球台数量",
+                              font=('Microsoft YaHei', 14, 'bold'),
+                              bg='#ecf0f1', fg='#2c3e50')
+        title_label.pack(pady=(0, 15))
+        
+        # 说明文字
+        info_frame = tk.Frame(main_frame, bg='#fff3cd', bd=2, relief='solid')
+        info_frame.pack(fill='x', pady=10)
+        
+        info_text = tk.Label(info_frame, 
+                            text="💡 球台使用顺序：2→3→4→5→6→7→8→9→1\n"
+                                 "例如：选择5张球台，将使用2、3、4、5、6号球台",
+                            font=('Microsoft YaHei', 10),
+                            bg='#fff3cd', fg='#856404',
+                            justify='left', padx=10, pady=8)
+        info_text.pack()
+        
+        # 球台数量选择
+        select_frame = tk.Frame(main_frame, bg='#ecf0f1')
+        select_frame.pack(pady=20)
+        
+        tk.Label(select_frame, text="球台数量：",
+                font=('Microsoft YaHei', 12, 'bold'),
+                bg='#ecf0f1').pack(side='left', padx=(0, 10))
+        
+        # 使用 Spinbox 选择球台数量
+        table_count_var = tk.IntVar(value=9)
+        spinbox = tk.Spinbox(select_frame, from_=1, to=9, width=5,
+                            textvariable=table_count_var,
+                            font=('Microsoft YaHei', 14, 'bold'),
+                            justify='center')
+        spinbox.pack(side='left')
+        
+        tk.Label(select_frame, text="张",
+                font=('Microsoft YaHei', 12),
+                bg='#ecf0f1').pack(side='left', padx=(5, 0))
+        
+        # 按钮框架
+        button_frame = tk.Frame(main_frame, bg='#ecf0f1')
+        button_frame.pack(pady=20)
+        
+        result = {'value': None}
+        
+        def on_confirm():
+            result['value'] = table_count_var.get()
+            dialog.destroy()
+        
+        def on_cancel():
+            dialog.destroy()
+        
+        confirm_btn = tk.Button(button_frame, text="✓ 确认",
+                               command=on_confirm,
+                               bg='#27ae60', fg='white',
+                               font=('Microsoft YaHei', 11, 'bold'),
+                               width=10, height=2)
+        confirm_btn.pack(side='left', padx=10)
+        
+        cancel_btn = tk.Button(button_frame, text="✗ 取消",
+                              command=on_cancel,
+                              bg='#e74c3c', fg='white',
+                              font=('Microsoft YaHei', 11, 'bold'),
+                              width=10, height=2)
+        cancel_btn.pack(side='left', padx=10)
+        
+        # 等待对话框关闭
+        self.root.wait_window(dialog)
+        
+        return result['value']
+    
     def restart_game(self):
         import os
         import json
+        
+        # 显示球台数量选择对话框
+        table_count = self.show_table_count_dialog()
+        
+        # 如果用户取消，则不执行后续操作
+        if table_count is None:
+            return
         
         # 保存当前选手列表
         current_players = [(p.name, p.initial_lives) for p in self.game.players]
@@ -1509,8 +1691,8 @@ class CrazySaturdayApp:
             for name, lives in self.example_players:
                 self.game.add_player(name, lives)
         
-        # 开始新比赛并进入第二页
-        if self.game.start_game():
+        # 开始新比赛并进入第二页（使用用户选择的球台数量）
+        if self.game.start_game(initial_table_count=table_count):
             # 创建一个空的状态文件
             self.game.save_states_to_file()
             self.create_game_screen()
