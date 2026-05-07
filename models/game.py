@@ -666,6 +666,132 @@ class Game:
         player.position = "已淘汰"
         player.table_id = None
     
+    def player_quit(self, player):
+        """选手弃赛 - HP直接扣为0，移至淘汰区"""
+        if player not in self.players:
+            return False
+        
+        if player.is_eliminated():
+            return False
+        
+        table_id = player.table_id
+        
+        # 判断选手位置
+        was_host = False
+        was_challenger = False
+        was_table_waiting = False
+        was_outside_waiting = player in self.outside_waiting
+        player_table = None
+        
+        for table in self.tables:
+            if table.host == player:
+                was_host = True
+                player_table = table
+                break
+            elif table.challenger == player:
+                was_challenger = True
+                player_table = table
+                break
+            elif player in table.waiting:
+                was_table_waiting = True
+                player_table = table
+                break
+        
+        # HP直接扣为0
+        old_hp = player.current_lives
+        player.current_lives = 0
+        player.lose_match()
+        
+        if was_host or was_challenger:
+            # 赛中选手弃赛：类似判负，但HP直接扣为0
+            winner = None
+            if was_challenger and player_table:
+                winner = player_table.host
+            elif was_host and player_table:
+                winner = player_table.challenger
+            
+            if winner:
+                winner.win_match()
+                start_time = datetime.datetime.now() - datetime.timedelta(minutes=5)
+                end_time = datetime.datetime.now()
+                self.record_match(player_table, winner, player, start_time, end_time)
+            
+            # 移至淘汰区
+            self.move_to_eliminated(player, table_id)
+            
+            # 调整球台位置
+            if was_challenger and player_table:
+                self.adjust_table_positions_after_challenger_elimination(player_table)
+            elif was_host and player_table:
+                self.adjust_table_positions_after_host_elimination(player_table)
+            
+            # 检查减桌
+            self.check_table_reduction()
+            
+            # 处理撤桌标记
+            if player_table and player_table.challenger is None and not player_table.waiting and player_table.host is not None:
+                if player_table.table_id not in self.tables_to_close:
+                    self.tables_to_close[player_table.table_id] = True
+                    self.closing_tables[player_table.table_id] = player_table
+            
+            if player_table and player_table.table_id in self.tables_to_close:
+                self.process_closing_table_after_elimination(player_table)
+            
+            self.fill_leftover_tables()
+            
+            if player_table and player_table.table_id in self.tables_to_close and player_table.challenger is None:
+                self.finalize_table_closing(player_table)
+        
+        elif was_table_waiting and player_table:
+            # 球桌候补选手弃赛
+            self.remove_player_from_current_position(player, table_id)
+            self.eliminated.append(player)
+            player.position = "已淘汰"
+            player.table_id = None
+            
+            # 场外候补区第一个选手移动到该球桌候补区
+            if (self.outside_waiting and 
+                player_table.table_id not in self.tables_to_close and 
+                player_table.table_id not in self.closing_tables and 
+                player_table.active):
+                new_waiting = self.outside_waiting.pop(0)
+                player_table.waiting.append(new_waiting)
+                new_waiting.position = f"{player_table.table_id}号台候补"
+                new_waiting.table_id = player_table.table_id
+            
+            self.check_table_reduction()
+            self.fill_leftover_tables()
+        
+        elif was_outside_waiting:
+            # 场外候补选手弃赛
+            self.outside_waiting.remove(player)
+            self.eliminated.append(player)
+            player.position = "已淘汰"
+            player.table_id = None
+            
+            self.check_table_reduction()
+            self.fill_leftover_tables()
+        
+        self.save_state(f"弃赛: {player.name} HP {old_hp}→0")
+        return True
+    
+    def add_challenger(self, name, hp):
+        """新增挑战者，加入场外候补区尾部"""
+        all_names = set()
+        for p in self.players:
+            all_names.add(p.name)
+        
+        if name in all_names:
+            return False, f"选手名称\"{name}\"已存在"
+        
+        new_player = Player(name, hp)
+        new_player.position = "场外候补"
+        self.players.append(new_player)
+        self.outside_waiting.append(new_player)
+        
+        self.save_state(f"挑战者加入: {name}(HP:{hp})")
+        return True, None
+    
     def remove_player_from_current_position(self, player, table_id):
         """从当前位置移除选手"""
         # 从球台移除

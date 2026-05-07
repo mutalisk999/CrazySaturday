@@ -731,6 +731,22 @@ class CrazySaturdayApp:
                                   width=12)
         destiny_button.pack(side='left', padx=5)
         
+        # 选手弃赛按钮
+        quit_button = tk.Button(left_frame, text="🚪 选手弃赛",
+                               command=self.show_quit_dialog,
+                               bg='#e74c3c', fg='white',
+                               font=('Microsoft YaHei', 11, 'bold'),
+                               width=12)
+        quit_button.pack(side='left', padx=5)
+        
+        # 挑战者加入按钮
+        join_button = tk.Button(left_frame, text="➕ 挑战者加入",
+                               command=self.show_join_dialog,
+                               bg='#27ae60', fg='white',
+                               font=('Microsoft YaHei', 11, 'bold'),
+                               width=12)
+        join_button.pack(side='left', padx=5)
+        
         status_label = tk.Label(left_frame, 
                               text=f"剩余选手：{self.game.get_remaining_players_count()}",
                               font=('Arial', 12))
@@ -1803,6 +1819,189 @@ class CrazySaturdayApp:
             
             # 刷新界面
             self.create_game_screen()
+    
+    def show_quit_dialog(self):
+        """显示选手弃赛对话框"""
+        quit_candidates = []
+        for table in self.game.tables:
+            if table.host and not table.host.is_eliminated():
+                quit_candidates.append((table.host.name, f"{table.table_id}号台擂主"))
+            if table.challenger and not table.challenger.is_eliminated():
+                quit_candidates.append((table.challenger.name, f"{table.table_id}号台挑战者"))
+            for w in table.waiting:
+                if not w.is_eliminated():
+                    quit_candidates.append((w.name, f"{table.table_id}号台候补"))
+        for p in self.game.outside_waiting:
+            if not p.is_eliminated():
+                quit_candidates.append((p.name, "场外候补"))
+        
+        if not quit_candidates:
+            messagebox.showwarning("提示", "没有可弃赛的选手！")
+            return
+        
+        dialog = tk.Toplevel(self.root)
+        dialog.title("🚪 选手弃赛")
+        dialog.geometry("400x300")
+        dialog.transient(self.root)
+        dialog.grab_set()
+        
+        dialog.update_idletasks()
+        x = self.root.winfo_x() + (self.root.winfo_width() - 400) // 2
+        y = self.root.winfo_y() + (self.root.winfo_height() - 300) // 2
+        dialog.geometry(f"+{x}+{y}")
+        
+        main_frame = tk.Frame(dialog, bg='#ecf0f1', padx=20, pady=20)
+        main_frame.pack(fill='both', expand=True)
+        
+        title_label = tk.Label(main_frame, text="🚪 选手弃赛",
+                              font=('Microsoft YaHei', 16, 'bold'),
+                              bg='#ecf0f1', fg='#2c3e50')
+        title_label.pack(pady=(0, 20))
+        
+        select_frame = tk.Frame(main_frame, bg='#ecf0f1')
+        select_frame.pack(fill='x', pady=10)
+        
+        tk.Label(select_frame, text="选择弃赛选手：",
+                font=('Microsoft YaHei', 12, 'bold'),
+                bg='#ecf0f1').pack(anchor='w')
+        
+        display_names = [f"{name}（{pos}）" for name, pos in quit_candidates]
+        selected_var = tk.StringVar()
+        combo = ttk.Combobox(select_frame, textvariable=selected_var,
+                            values=display_names, state='readonly',
+                            font=('Microsoft YaHei', 12), width=30)
+        combo.pack(fill='x', pady=5)
+        if display_names:
+            combo.current(0)
+        
+        error_label = tk.Label(main_frame, text="",
+                              font=('Microsoft YaHei', 10),
+                              bg='#ecf0f1', fg='#e74c3c')
+        error_label.pack(anchor='w', pady=5)
+        
+        def on_confirm():
+            idx = combo.current()
+            if idx < 0:
+                error_label.config(text="请选择要弃赛的选手！")
+                return
+            
+            player_name = quit_candidates[idx][0]
+            player = None
+            for p in self.game.players:
+                if p.name == player_name and not p.is_eliminated():
+                    player = p
+                    break
+            
+            if not player:
+                error_label.config(text="未找到该选手！")
+                return
+            
+            if not messagebox.askyesno("确认弃赛",
+                                       f"确定要让 {player_name} 弃赛吗？\n弃赛后HP将直接扣为0，不可撤销！"):
+                return
+            
+            result = self.game.player_quit(player)
+            if result:
+                dialog.destroy()
+                messagebox.showinfo("弃赛成功", f"{player_name} 已弃赛，移至淘汰区！")
+                self.create_game_screen()
+            else:
+                error_label.config(text="弃赛操作失败，请重试！")
+        
+        btn_frame = tk.Frame(main_frame, bg='#ecf0f1')
+        btn_frame.pack(pady=20)
+        
+        tk.Button(btn_frame, text="确认弃赛", command=on_confirm,
+                 bg='#e74c3c', fg='white',
+                 font=('Microsoft YaHei', 12, 'bold'),
+                 width=10, padx=10, pady=5).pack(side='left', padx=10)
+        
+        tk.Button(btn_frame, text="取消", command=dialog.destroy,
+                 bg='#95a5a6', fg='white',
+                 font=('Microsoft YaHei', 12, 'bold'),
+                 width=10, padx=10, pady=5).pack(side='left', padx=10)
+    
+    def show_join_dialog(self):
+        """显示挑战者加入对话框"""
+        dialog = tk.Toplevel(self.root)
+        dialog.title("➕ 挑战者加入")
+        dialog.geometry("480x400")
+        dialog.transient(self.root)
+        dialog.grab_set()
+        
+        dialog.update_idletasks()
+        x = self.root.winfo_x() + (self.root.winfo_width() - 480) // 2
+        y = self.root.winfo_y() + (self.root.winfo_height() - 400) // 2
+        dialog.geometry(f"+{x}+{y}")
+        
+        main_frame = tk.Frame(dialog, bg='#ecf0f1', padx=20, pady=20)
+        main_frame.pack(fill='both', expand=True)
+        
+        title_label = tk.Label(main_frame, text="➕ 挑战者加入",
+                              font=('Microsoft YaHei', 16, 'bold'),
+                              bg='#ecf0f1', fg='#2c3e50')
+        title_label.pack(pady=(0, 20))
+        
+        name_frame = tk.Frame(main_frame, bg='#ecf0f1')
+        name_frame.pack(fill='x', pady=10)
+        
+        tk.Label(name_frame, text="选手姓名：",
+                font=('Microsoft YaHei', 12, 'bold'),
+                bg='#ecf0f1').pack(anchor='w')
+        
+        name_var = tk.StringVar()
+        name_entry = tk.Entry(name_frame, textvariable=name_var,
+                             font=('Microsoft YaHei', 12), width=25)
+        name_entry.pack(fill='x', pady=5)
+        
+        hp_frame = tk.LabelFrame(main_frame, text="生命值",
+                                 font=('Microsoft YaHei', 11, 'bold'),
+                                 bg='#ecf0f1', padx=10, pady=10)
+        hp_frame.pack(fill='x', pady=15)
+        
+        hp_var = tk.IntVar(value=3)
+        hp_buttons_frame = tk.Frame(hp_frame, bg='#ecf0f1')
+        hp_buttons_frame.pack()
+        
+        for hp_val in range(2, 9):
+            rb = tk.Radiobutton(hp_buttons_frame, text=str(hp_val),
+                               variable=hp_var, value=hp_val,
+                               font=('Microsoft YaHei', 12, 'bold'),
+                               bg='#ecf0f1', activebackground='#ecf0f1')
+            rb.pack(side='left', padx=10)
+        
+        error_label = tk.Label(main_frame, text="",
+                              font=('Microsoft YaHei', 10),
+                              bg='#ecf0f1', fg='#e74c3c')
+        error_label.pack(anchor='w', pady=5)
+        
+        def on_confirm():
+            name = name_var.get().strip()
+            if not name:
+                error_label.config(text="选手姓名不能为空！")
+                return
+            
+            hp = hp_var.get()
+            success, err_msg = self.game.add_challenger(name, hp)
+            if success:
+                dialog.destroy()
+                messagebox.showinfo("加入成功", f"{name}(HP:{hp}) 已加入场外候补区！")
+                self.create_game_screen()
+            else:
+                error_label.config(text=err_msg)
+        
+        btn_frame = tk.Frame(main_frame, bg='#ecf0f1')
+        btn_frame.pack(pady=20)
+        
+        tk.Button(btn_frame, text="确认加入", command=on_confirm,
+                 bg='#27ae60', fg='white',
+                 font=('Microsoft YaHei', 12, 'bold'),
+                 width=10, padx=10, pady=5).pack(side='left', padx=10)
+        
+        tk.Button(btn_frame, text="取消", command=dialog.destroy,
+                 bg='#95a5a6', fg='white',
+                 font=('Microsoft YaHei', 12, 'bold'),
+                 width=10, padx=10, pady=5).pack(side='left', padx=10)
     
     def update_players_table(self):
         """更新选手表格内容"""
