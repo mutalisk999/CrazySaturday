@@ -53,6 +53,9 @@ class Game:
         
         # 初始球台数量（默认9张）
         self.initial_table_count = 9
+        
+        # 比赛名称
+        self.game_name = ""
     
     def calculate_required_tables(self, player_count: int) -> int:
         """根据选手数量计算需要的球台数量"""
@@ -77,19 +80,19 @@ class Game:
         else:
             return 9
     
-    def setup_tables(self, table_count: int = None):
-        if table_count is None:
+    def setup_tables(self, table_count: int = None, table_ids: list = None):
+        if table_ids is not None:
+            tables_to_use = table_ids
+        elif table_count is not None:
+            table_count = max(1, min(20, table_count))
+            tables_to_use = self.table_priority[:table_count]
+        else:
             table_count = self.initial_table_count
+            tables_to_use = self.table_priority[:table_count]
         
-        # 确保球台数量在合理范围内
-        table_count = max(1, min(9, table_count))
+        self.initial_table_count = len(tables_to_use)
         
-        # 保存初始球台数量
-        self.initial_table_count = table_count
-        
-        # 创建球台
         self.tables = []
-        tables_to_use = self.table_priority[:table_count]
         for table_id in tables_to_use:
             self.tables.append(Table(table_id))
     
@@ -111,15 +114,22 @@ class Game:
             return self.players.pop(index)
         return None
     
-    def start_game(self, initial_table_count: int = None):
+    def start_game(self, initial_table_count: int = None, table_ids: list = None, game_name: str = ""):
         if len(self.players) < 2:
             return False
         
-        # 设置初始球台数量
-        if initial_table_count is not None:
-            self.initial_table_count = initial_table_count
+        if game_name:
+            self.game_name = game_name
         
-        self.setup_tables(self.initial_table_count)
+        if table_ids is not None:
+            self.table_priority = table_ids[:]
+            self.table_close_order = list(reversed(table_ids[:]))
+            self.setup_tables(table_ids=table_ids)
+        elif initial_table_count is not None:
+            self.initial_table_count = initial_table_count
+            self.setup_tables(initial_table_count)
+        else:
+            self.setup_tables(self.initial_table_count)
         
         # 随机分配选手到球台区和场外候补区
         random.shuffle(self.players)
@@ -833,7 +843,10 @@ class Game:
             "closing_tables": {k: True for k in self.closing_tables.keys()},  # 只保存table_id
             "leftover_tables_queue": self.leftover_tables_queue.copy(),
             "match_records": self._deep_copy_match_records(),
-            "initial_table_count": self.initial_table_count
+            "initial_table_count": self.initial_table_count,
+            "game_name": self.game_name,
+            "table_priority": self.table_priority[:],
+            "table_close_order": self.table_close_order[:]
         }
         
         # 如果当前不是在最新状态，删除之后的所有状态
@@ -892,6 +905,20 @@ class Game:
             self.initial_table_count = state["initial_table_count"]
         else:
             self.initial_table_count = 9  # 默认值
+        
+        # 恢复比赛名称
+        if "game_name" in state:
+            self.game_name = state["game_name"]
+        else:
+            self.game_name = ""
+        
+        # 恢复球台使用顺序
+        if "table_priority" in state:
+            self.table_priority = state["table_priority"][:]
+        
+        # 恢复球台撤台顺序
+        if "table_close_order" in state:
+            self.table_close_order = state["table_close_order"][:]
         
         self.current_state_index = state_index
         
@@ -1055,7 +1082,10 @@ class Game:
                 "closing_tables": state["closing_tables"],
                 "leftover_tables_queue": state["leftover_tables_queue"],
                 "match_records": state.get("match_records", []),
-                "initial_table_count": state.get("initial_table_count", 9)
+                "initial_table_count": state.get("initial_table_count", 9),
+                "game_name": state.get("game_name", ""),
+                "table_priority": state.get("table_priority", [2, 3, 4, 5, 6, 7, 8, 9, 1]),
+                "table_close_order": state.get("table_close_order", [1, 9, 8, 7, 6, 5, 4, 3, 2])
             }
             states_data.append(state_data)
         
