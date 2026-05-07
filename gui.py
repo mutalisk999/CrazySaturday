@@ -289,7 +289,7 @@ class CrazySaturdayApp:
         header_frame.pack(fill='x')
         header_frame.pack_propagate(False)
         
-        title_label = tk.Label(header_frame, text="🏆 疯狂星期六抢1大赛 - 比赛进行中", 
+        title_label = tk.Label(header_frame, text=f"🏆 {self.game.game_name or '疯狂星期六抢1大赛'} - 比赛进行中", 
                               font=('Microsoft YaHei', 18, 'bold'),
                               bg='#2c3e50', fg='white')
         title_label.pack(expand=True)
@@ -318,7 +318,7 @@ class CrazySaturdayApp:
         left_content.pack(fill='both', expand=True, padx=5, pady=5)
         
         # 球台滚动区域
-        tables_canvas = tk.Canvas(left_content, height=320, bg='white', highlightthickness=0)
+        tables_canvas = tk.Canvas(left_content, bg='white', highlightthickness=0)
         scrollbar = ttk.Scrollbar(left_content, orient="vertical", command=tables_canvas.yview)
         scrollable_frame = tk.Frame(tables_canvas, bg='white')
         
@@ -330,165 +330,177 @@ class CrazySaturdayApp:
         tables_canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
         tables_canvas.configure(yscrollcommand=scrollbar.set)
         
-        # 显示球台 - 水平排列
-        row_frame = None
-        tables_per_row = 3  # 每行显示3个球台
-        table_count = 0
-        
         # 按照table_priority顺序排序球台
         table_priority = self.game.table_priority
-        # 创建一个字典，将table_id映射到优先级索引
         table_id_to_priority = {table_id: i for i, table_id in enumerate(table_priority)}
-        # 按照优先级排序球台
         sorted_tables = sorted(self.game.tables, key=lambda t: table_id_to_priority.get(t.table_id, 999))
         
-        for table in sorted_tables:
-            if table.active:
-                # 检查球台是否被标记为需要关闭
-                is_closing_table = table.table_id in self.game.tables_to_close
+        active_tables = [t for t in sorted_tables if t.active]
+        active_count = len(active_tables)
+        
+        tables_per_row = 3
+        
+        if active_count <= 2:
+            name_font_size = 16
+            prefix_font_size = 13
+            title_font_size = 13
+            btn_font_size = 10
+            waiting_font_size = 14
+        elif active_count <= 4:
+            name_font_size = 15
+            prefix_font_size = 12
+            title_font_size = 12
+            btn_font_size = 9
+            waiting_font_size = 13
+        elif active_count <= 9:
+            name_font_size = 14
+            prefix_font_size = 11
+            title_font_size = 11
+            btn_font_size = 9
+            waiting_font_size = 13
+        else:
+            name_font_size = 12
+            prefix_font_size = 10
+            title_font_size = 10
+            btn_font_size = 8
+            waiting_font_size = 11
+        
+        table_count = 0
+        row_frame = None
+        
+        for table in active_tables:
+            is_closing_table = table.table_id in self.game.tables_to_close
+            
+            if table_count % tables_per_row == 0:
+                row_frame = tk.Frame(scrollable_frame, bg='white')
+                row_frame.pack(anchor='w', padx=5, pady=5)
+            
+            title_text = f"{table.table_id}号球台"
+            if is_closing_table:
+                title_text += " ⚠️即将撤桌"
+            
+            table_card_bg = '#ffebee' if is_closing_table else '#f8f9fa'
+            table_frame = tk.Frame(row_frame, bg=table_card_bg, bd=2, relief='solid',
+                                  highlightbackground='#dee2e6', highlightthickness=1,
+                                  width=280, height=150)
+            table_frame.pack(side='left', padx=5, pady=5)
+            table_frame.pack_propagate(False)
+            
+            header_bg = '#e74c3c' if is_closing_table else '#34495e'
+            table_header = tk.Frame(table_frame, bg=header_bg, height=28)
+            table_header.pack(fill='x')
+            table_header.pack_propagate(False)
+            
+            table_title = tk.Label(table_header, text=title_text, 
+                                  font=('Microsoft YaHei', title_font_size, 'bold'),
+                                  bg=header_bg, fg='white')
+            table_title.pack(side='left', padx=(10, 0))
+            
+            if is_closing_table:
+                close_button = tk.Button(table_header, text="已标记撤台",
+                                       bg='#95a5a6', fg='white',
+                                       font=('Microsoft YaHei', btn_font_size, 'bold'),
+                                       state='disabled',
+                                       padx=5, pady=1)
+                close_button.pack(side='right', padx=5, pady=3)
+            else:
+                close_button = tk.Button(table_header, text="撤台",
+                                       bg='#e67e22', fg='white',
+                                       font=('Microsoft YaHei', btn_font_size, 'bold'),
+                                       activebackground='#d35400',
+                                       padx=8, pady=1,
+                                       command=lambda tid=table.table_id: self.manual_close_table(tid))
+                close_button.pack(side='right', padx=5, pady=3)
+            
+            table_count += 1
+            
+            host_frame = tk.Frame(table_frame, bg=table_card_bg)
+            host_frame.pack(fill='x', padx=8, pady=4)
+            
+            if table.host and table.challenger:
+                host_button = tk.Button(host_frame, text="判负", width=5,
+                                      bg='#e74c3c', fg='white',
+                                      font=('Microsoft YaHei', btn_font_size, 'bold'),
+                                      command=lambda p=table.host, tid=table.table_id: 
+                                      self.eliminate_player(p, tid, "擂主"))
+                host_button.pack(side='left', padx=(0, 8))
+            
+            host_label_prefix = tk.Label(host_frame, text="👑 擂主: ", 
+                                        bg=table_card_bg, font=('Microsoft YaHei', prefix_font_size, 'bold'))
+            host_label_prefix.pack(side='left')
+            
+            if table.host:
+                host_name_text = f"{table.host.name} ({table.host.current_lives}/{table.host.initial_lives})"
+                host_name_color = '#e74c3c' if table.host.current_lives == 1 else 'black'
+            else:
+                host_name_text = '等待中...'
+                host_name_color = '#95a5a6'
+            
+            host_label_name = tk.Label(host_frame, text=host_name_text, fg=host_name_color, 
+                                      bg=table_card_bg, font=('Microsoft YaHei', name_font_size))
+            host_label_name.pack(side='left', fill='x', expand=True)
+            
+            challenger_frame = tk.Frame(table_frame, bg=table_card_bg)
+            challenger_frame.pack(fill='x', padx=8, pady=4)
+            
+            if table.host and table.challenger:
+                challenger_button = tk.Button(challenger_frame, text="判负", width=5,
+                                             bg='#e74c3c', fg='white',
+                                             font=('Microsoft YaHei', btn_font_size, 'bold'),
+                                             command=lambda p=table.challenger, tid=table.table_id: 
+                                             self.eliminate_player(p, tid, "挑战者"))
+                challenger_button.pack(side='left', padx=(0, 8))
+            
+            challenger_label_prefix = tk.Label(challenger_frame, text="⚔️ 挑战者: ", 
+                                              bg=table_card_bg, font=('Microsoft YaHei', prefix_font_size, 'bold'))
+            challenger_label_prefix.pack(side='left')
+            
+            if table.challenger:
+                challenger_name_text = f"{table.challenger.name} ({table.challenger.current_lives}/{table.challenger.initial_lives})"
+                challenger_name_color = '#e74c3c' if table.challenger.current_lives == 1 else 'black'
+            else:
+                challenger_name_text = '等待中...'
+                challenger_name_color = '#95a5a6'
+            
+            challenger_label_name = tk.Label(challenger_frame, text=challenger_name_text, 
+                                            fg=challenger_name_color, bg=table_card_bg, 
+                                            font=('Microsoft YaHei', name_font_size))
+            challenger_label_name.pack(side='left', fill='x', expand=True)
+            
+            waiting_frame = tk.Frame(table_frame, bg=table_card_bg)
+            waiting_frame.pack(fill='x', padx=8, pady=4)
+            
+            placeholder = tk.Label(waiting_frame, text="", width=5, bg=table_card_bg)
+            placeholder.pack(side='left', padx=(0, 8))
+            
+            waiting_label_prefix = tk.Label(waiting_frame, text="⏳ 候补: ", 
+                                           bg=table_card_bg, font=('Microsoft YaHei', prefix_font_size, 'bold'))
+            waiting_label_prefix.pack(side='left')
+            
+            if table.waiting:
+                waiting_parts = []
+                for player in table.waiting:
+                    name_text = f"{player.name}({player.current_lives}/{player.initial_lives})"
+                    if player.current_lives == 1:
+                        waiting_parts.append(('red', name_text))
+                    else:
+                        waiting_parts.append((None, name_text))
                 
-                # 每行开始时创建新的行框架
-                if table_count % tables_per_row == 0:
-                    row_frame = tk.Frame(scrollable_frame, bg='white')
-                    row_frame.pack(anchor='w', padx=5, pady=5)
-                
-                # 根据是否即将撤桌设置标题颜色
-                title_text = f"{table.table_id}号球台"
-                if is_closing_table:
-                    title_text += " ⚠️即将撤桌"
-                
-                # 球台卡片样式
-                table_card_bg = '#ffebee' if is_closing_table else '#f8f9fa'
-                table_frame = tk.Frame(row_frame, bg=table_card_bg, bd=2, relief='solid',
-                                      highlightbackground='#dee2e6', highlightthickness=1)
-                table_frame.pack(side='left', padx=5, pady=5)
-                
-                # 球台标题栏
-                header_bg = '#e74c3c' if is_closing_table else '#34495e'
-                table_header = tk.Frame(table_frame, bg=header_bg, height=28)
-                table_header.pack(fill='x')
-                table_header.pack_propagate(False)
-                
-                # 球台标题
-                table_title = tk.Label(table_header, text=title_text, 
-                                      font=('Microsoft YaHei', 11, 'bold'),
-                                      bg=header_bg, fg='white')
-                table_title.pack(side='left', padx=(10, 0))
-                
-                # 撤台按钮
-                if is_closing_table:
-                    # 已标记为撤台，显示禁用按钮
-                    close_button = tk.Button(table_header, text="已标记撤台",
-                                           bg='#95a5a6', fg='white',
-                                           font=('Microsoft YaHei', 8, 'bold'),
-                                           state='disabled',
-                                           padx=5, pady=1)
-                    close_button.pack(side='right', padx=5, pady=3)
-                else:
-                    # 未标记撤台，显示可点击按钮
-                    close_button = tk.Button(table_header, text="撤台",
-                                           bg='#e67e22', fg='white',
-                                           font=('Microsoft YaHei', 8, 'bold'),
-                                           activebackground='#d35400',
-                                           padx=8, pady=1,
-                                           command=lambda tid=table.table_id: self.manual_close_table(tid))
-                    close_button.pack(side='right', padx=5, pady=3)
-                
-                table_count += 1
-                
-                # 擂主区域
-                host_frame = tk.Frame(table_frame, bg=table_card_bg)
-                host_frame.pack(fill='x', padx=8, pady=4)
-                
-                # 擂主判负离场按钮
-                if table.host and table.challenger:
-                    host_button = tk.Button(host_frame, text="判负", width=5,
-                                          bg='#e74c3c', fg='white',
-                                          font=('Microsoft YaHei', 9, 'bold'),
-                                          command=lambda p=table.host, tid=table.table_id: 
-                                          self.eliminate_player(p, tid, "擂主"))
-                    host_button.pack(side='left', padx=(0, 8))
-                
-                host_label_prefix = tk.Label(host_frame, text="👑 擂主: ", 
-                                            bg=table_card_bg, font=('Microsoft YaHei', 11, 'bold'))
-                host_label_prefix.pack(side='left')
-                
-                if table.host:
-                    host_name_text = f"{table.host.name} ({table.host.current_lives}/{table.host.initial_lives})"
-                    host_name_color = '#e74c3c' if table.host.current_lives == 1 else 'black'
-                else:
-                    host_name_text = '等待中...'
-                    host_name_color = '#95a5a6'
-                
-                host_label_name = tk.Label(host_frame, text=host_name_text, fg=host_name_color, 
-                                          bg=table_card_bg, font=('Microsoft YaHei', 14))
-                host_label_name.pack(side='left', fill='x', expand=True)
-                
-                # 挑战者区域
-                challenger_frame = tk.Frame(table_frame, bg=table_card_bg)
-                challenger_frame.pack(fill='x', padx=8, pady=4)
-                
-                # 挑战者判负离场按钮
-                if table.host and table.challenger:
-                    challenger_button = tk.Button(challenger_frame, text="判负", width=5,
-                                                 bg='#e74c3c', fg='white',
-                                                 font=('Microsoft YaHei', 9, 'bold'),
-                                                 command=lambda p=table.challenger, tid=table.table_id: 
-                                                 self.eliminate_player(p, tid, "挑战者"))
-                    challenger_button.pack(side='left', padx=(0, 8))
-                
-                challenger_label_prefix = tk.Label(challenger_frame, text="⚔️ 挑战者: ", 
-                                                  bg=table_card_bg, font=('Microsoft YaHei', 11, 'bold'))
-                challenger_label_prefix.pack(side='left')
-                
-                if table.challenger:
-                    challenger_name_text = f"{table.challenger.name} ({table.challenger.current_lives}/{table.challenger.initial_lives})"
-                    challenger_name_color = '#e74c3c' if table.challenger.current_lives == 1 else 'black'
-                else:
-                    challenger_name_text = '等待中...'
-                    challenger_name_color = '#95a5a6'
-                
-                challenger_label_name = tk.Label(challenger_frame, text=challenger_name_text, 
-                                                fg=challenger_name_color, bg=table_card_bg, 
-                                                font=('Microsoft YaHei', 14))
-                challenger_label_name.pack(side='left', fill='x', expand=True)
-                
-                # 候补区域
-                waiting_frame = tk.Frame(table_frame, bg=table_card_bg)
-                waiting_frame.pack(fill='x', padx=8, pady=4)
-                
-                # 占位保持对齐
-                placeholder = tk.Label(waiting_frame, text="", width=5, bg=table_card_bg)
-                placeholder.pack(side='left', padx=(0, 8))
-                
-                waiting_label_prefix = tk.Label(waiting_frame, text="⏳ 候补: ", 
-                                               bg=table_card_bg, font=('Microsoft YaHei', 11, 'bold'))
-                waiting_label_prefix.pack(side='left')
-                
-                if table.waiting:
-                    waiting_parts = []
-                    for player in table.waiting:
-                        name_text = f"{player.name}({player.current_lives}/{player.initial_lives})"
-                        if player.current_lives == 1:
-                            waiting_parts.append(('red', name_text))
-                        else:
-                            waiting_parts.append((None, name_text))
+                for i, (color, text) in enumerate(waiting_parts):
+                    if i > 0:
+                        sep_label = tk.Label(waiting_frame, text="，", 
+                                            bg=table_card_bg, font=('Microsoft YaHei', waiting_font_size))
+                        sep_label.pack(side='left')
                     
-                    for i, (color, text) in enumerate(waiting_parts):
-                        if i > 0:
-                            sep_label = tk.Label(waiting_frame, text="，", 
-                                                bg=table_card_bg, font=('Microsoft YaHei', 13))
-                            sep_label.pack(side='left')
-                        
-                        fg_color = color if color else 'black'
-                        name_label = tk.Label(waiting_frame, text=text, 
-                                             bg=table_card_bg, font=('Microsoft YaHei', 13),
-                                             fg=fg_color)
-                        name_label.pack(side='left')
-                else:
-                    waiting_label = tk.Label(waiting_frame, text="暂无", 
-                                            fg='#95a5a6', bg=table_card_bg, font=('Microsoft YaHei', 13))
-                    waiting_label.pack(side='left', fill='x', expand=True)
+                    fg_color = color if color else 'black'
+                    name_label = tk.Label(waiting_frame, text=text, 
+                                         bg=table_card_bg, font=('Microsoft YaHei', waiting_font_size),
+                                         fg=fg_color)
+                    name_label.pack(side='left')
+            else:
+                waiting_label = tk.Label(waiting_frame, text="暂无", 
+                                        fg='#95a5a6', bg=table_card_bg, font=('Microsoft YaHei', waiting_font_size))
+                waiting_label.pack(side='left', fill='x', expand=True)
         
         tables_canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
@@ -1805,73 +1817,163 @@ class CrazySaturdayApp:
             self.players_table.insert('', 'end', values=(i+1, player.name, dots))
     
     def show_table_count_dialog(self):
-        """显示球桌数量选择对话框
+        """显示重新开始比赛对话框
         
         Returns:
-            int or None: 用户选择的球台数量，如果取消则返回None
+            dict or None: {'game_name': str, 'table_ids': list[int]}，如果取消则返回None
         """
         dialog = tk.Toplevel(self.root)
-        dialog.title("选择初始球台数量")
-        dialog.geometry("450x350")
+        dialog.title("重新开始比赛")
+        dialog.geometry("550x500")
         dialog.transient(self.root)
         dialog.grab_set()
+        dialog.resizable(False, False)
         
-        # 居中显示
         dialog.update_idletasks()
         x = (dialog.winfo_screenwidth() - dialog.winfo_width()) // 2
         y = (dialog.winfo_screenheight() - dialog.winfo_height()) // 2
         dialog.geometry(f"+{x}+{y}")
         
-        # 主框架
         main_frame = tk.Frame(dialog, bg='#ecf0f1', padx=20, pady=20)
         main_frame.pack(fill='both', expand=True)
         
-        # 标题
-        title_label = tk.Label(main_frame, text="🎱 请选择初始使用的球台数量",
-                              font=('Microsoft YaHei', 14, 'bold'),
+        title_label = tk.Label(main_frame, text="🎱 重新开始比赛",
+                              font=('Microsoft YaHei', 16, 'bold'),
                               bg='#ecf0f1', fg='#2c3e50')
         title_label.pack(pady=(0, 15))
         
-        # 说明文字
-        info_frame = tk.Frame(main_frame, bg='#fff3cd', bd=2, relief='solid')
-        info_frame.pack(fill='x', pady=10)
+        game_name_frame = tk.Frame(main_frame, bg='#ecf0f1')
+        game_name_frame.pack(fill='x', pady=10)
         
-        info_text = tk.Label(info_frame, 
-                            text="💡 球台使用顺序：2→3→4→5→6→7→8→9→1\n"
-                                 "例如：选择5张球台，将使用2、3、4、5、6号球台",
-                            font=('Microsoft YaHei', 10),
-                            bg='#fff3cd', fg='#856404',
-                            justify='left', padx=10, pady=8)
-        info_text.pack()
-        
-        # 球台数量选择
-        select_frame = tk.Frame(main_frame, bg='#ecf0f1')
-        select_frame.pack(pady=20)
-        
-        tk.Label(select_frame, text="球台数量：",
+        tk.Label(game_name_frame, text="比赛名称：",
                 font=('Microsoft YaHei', 12, 'bold'),
                 bg='#ecf0f1').pack(side='left', padx=(0, 10))
         
-        # 使用 Spinbox 选择球台数量
+        game_name_var = tk.StringVar(value="")
+        game_name_entry = tk.Entry(game_name_frame, textvariable=game_name_var,
+                                   font=('Microsoft YaHei', 12), width=25)
+        game_name_entry.pack(side='left', fill='x', expand=True)
+        
+        table_count_frame = tk.Frame(main_frame, bg='#ecf0f1')
+        table_count_frame.pack(fill='x', pady=10)
+        
+        tk.Label(table_count_frame, text="球桌数量：",
+                font=('Microsoft YaHei', 12, 'bold'),
+                bg='#ecf0f1').pack(side='left', padx=(0, 10))
+        
         table_count_var = tk.IntVar(value=9)
-        spinbox = tk.Spinbox(select_frame, from_=1, to=9, width=5,
+        spinbox = tk.Spinbox(table_count_frame, from_=1, to=20, width=5,
                             textvariable=table_count_var,
                             font=('Microsoft YaHei', 14, 'bold'),
-                            justify='center')
+                            justify='center',
+                            command=lambda: on_table_count_change())
         spinbox.pack(side='left')
         
-        tk.Label(select_frame, text="张",
+        tk.Label(table_count_frame, text="张",
                 font=('Microsoft YaHei', 12),
                 bg='#ecf0f1').pack(side='left', padx=(5, 0))
         
-        # 按钮框架
+        table_order_label = tk.Label(main_frame, text="桌号顺序（用逗号分隔，如：2,3,4,5,6）：",
+                                    font=('Microsoft YaHei', 11, 'bold'),
+                                    bg='#ecf0f1', fg='#2c3e50')
+        table_order_label.pack(anchor='w', pady=(15, 5))
+        
+        order_input_frame = tk.Frame(main_frame, bg='#ecf0f1')
+        order_input_frame.pack(fill='x', pady=5)
+        
+        table_order_var = tk.StringVar(value="2,3,4,5,6,7,8,9,1")
+        table_order_entry = tk.Entry(order_input_frame, textvariable=table_order_var,
+                                     font=('Microsoft YaHei', 14, 'bold'), width=30,
+                                     justify='center')
+        table_order_entry.pack(fill='x')
+        
+        preview_frame = tk.LabelFrame(main_frame, text="桌号预览",
+                                      font=('Microsoft YaHei', 10, 'bold'),
+                                      bg='#ecf0f1', padx=10, pady=8)
+        preview_frame.pack(fill='x', pady=10)
+        
+        preview_label = tk.Label(preview_frame, text="2→3→4→5→6→7→8→9→1",
+                                font=('Microsoft YaHei', 12),
+                                bg='#ecf0f1', fg='#3498db',
+                                wraplength=450, justify='left')
+        preview_label.pack(fill='x')
+        
+        error_label = tk.Label(main_frame, text="",
+                              font=('Microsoft YaHei', 10),
+                              bg='#ecf0f1', fg='#e74c3c')
+        error_label.pack(anchor='w', pady=5)
+        
+        def parse_table_ids(order_str):
+            parts = [p.strip() for p in order_str.split(',') if p.strip()]
+            if not parts:
+                return None, "请输入桌号"
+            try:
+                return [int(p) for p in parts], None
+            except ValueError:
+                return None, "桌号顺序只能包含数字"
+        
+        def update_preview():
+            order_str = table_order_var.get().strip()
+            if order_str:
+                table_ids, err = parse_table_ids(order_str)
+                if err:
+                    preview_label.config(text=err, fg='#e74c3c')
+                else:
+                    preview_text = "→".join(str(t) for t in table_ids)
+                    preview_label.config(text=preview_text, fg='#3498db')
+            else:
+                preview_label.config(text="请输入桌号", fg='#95a5a6')
+        
+        def on_table_count_change():
+            count = table_count_var.get()
+            default_ids = [2, 3, 4, 5, 6, 7, 8, 9, 1]
+            if count <= len(default_ids):
+                selected = default_ids[:count]
+            else:
+                selected = default_ids + list(range(10, 10 + count - len(default_ids)))
+            table_order_var.set(",".join(str(t) for t in selected))
+            update_preview()
+        
+        table_order_var.trace_add('write', lambda *args: update_preview())
+        
         button_frame = tk.Frame(main_frame, bg='#ecf0f1')
-        button_frame.pack(pady=20)
+        button_frame.pack(pady=15)
         
         result = {'value': None}
         
         def on_confirm():
-            result['value'] = table_count_var.get()
+            game_name = game_name_var.get().strip()
+            if not game_name:
+                error_label.config(text="❌ 比赛名称不能为空！")
+                return
+            
+            order_str = table_order_var.get().strip()
+            if not order_str:
+                error_label.config(text="❌ 请输入桌号顺序！")
+                return
+            
+            table_ids, err = parse_table_ids(order_str)
+            if err:
+                error_label.config(text=f"❌ {err}！")
+                return
+            
+            count = table_count_var.get()
+            if len(table_ids) != count:
+                error_label.config(text=f"❌ 桌号数量({len(table_ids)})与球桌数量({count})不一致！")
+                return
+            
+            if len(set(table_ids)) != len(table_ids):
+                error_label.config(text="❌ 桌号顺序中存在重复的桌号！")
+                return
+            
+            if any(t < 0 or t > 99 for t in table_ids):
+                error_label.config(text="❌ 桌号必须在0-99之间！")
+                return
+            
+            result['value'] = {
+                'game_name': game_name,
+                'table_ids': table_ids
+            }
             dialog.destroy()
         
         def on_cancel():
@@ -1891,7 +1993,6 @@ class CrazySaturdayApp:
                               width=10, height=2)
         cancel_btn.pack(side='left', padx=10)
         
-        # 等待对话框关闭
         self.root.wait_window(dialog)
         
         return result['value']
@@ -1900,37 +2001,31 @@ class CrazySaturdayApp:
         import os
         import json
         
-        # 显示球台数量选择对话框
-        table_count = self.show_table_count_dialog()
+        dialog_result = self.show_table_count_dialog()
         
-        # 如果用户取消，则不执行后续操作
-        if table_count is None:
+        if dialog_result is None:
             return
         
-        # 保存当前选手列表
+        game_name = dialog_result['game_name']
+        table_ids = dialog_result['table_ids']
+        
         current_players = [(p.name, p.initial_lives) for p in self.game.players]
         
-        # 删除历史状态文件
         state_file = "game_states.json"
         if os.path.exists(state_file):
             os.remove(state_file)
             print(f"已删除状态文件: {state_file}")
         
-        # 重新开始游戏
         self.game = Game()
         
-        # 重新添加之前保存的选手
         if current_players:
             for name, lives in current_players:
                 self.game.add_player(name, lives)
         else:
-            # 如果没有选手，添加示例选手
             for name, lives in self.example_players:
                 self.game.add_player(name, lives)
         
-        # 开始新比赛并进入第二页（使用用户选择的球台数量）
-        if self.game.start_game(initial_table_count=table_count):
-            # 创建一个空的状态文件
+        if self.game.start_game(table_ids=table_ids, game_name=game_name):
             self.game.save_states_to_file()
             self.create_game_screen()
     
