@@ -1841,29 +1841,32 @@ class CrazySaturdayApp:
         
         dialog = tk.Toplevel(self.root)
         dialog.title("🚪 选手弃赛")
-        dialog.geometry("400x300")
+        dialog.geometry("450x380")
         dialog.transient(self.root)
         dialog.grab_set()
         
         dialog.update_idletasks()
-        x = self.root.winfo_x() + (self.root.winfo_width() - 400) // 2
-        y = self.root.winfo_y() + (self.root.winfo_height() - 300) // 2
+        x = (dialog.winfo_screenwidth() - dialog.winfo_width()) // 2
+        y = (dialog.winfo_screenheight() - dialog.winfo_height()) // 2
         dialog.geometry(f"+{x}+{y}")
         
-        main_frame = tk.Frame(dialog, bg='#ecf0f1', padx=20, pady=20)
+        main_frame = tk.Frame(dialog, bg='#ecf0f1', padx=25, pady=25)
         main_frame.pack(fill='both', expand=True)
         
         title_label = tk.Label(main_frame, text="🚪 选手弃赛",
-                              font=('Microsoft YaHei', 16, 'bold'),
-                              bg='#ecf0f1', fg='#2c3e50')
-        title_label.pack(pady=(0, 20))
+                              font=('Microsoft YaHei', 18, 'bold'),
+                              bg='#ecf0f1', fg='#e74c3c')
+        title_label.pack(pady=(0, 10))
         
-        select_frame = tk.Frame(main_frame, bg='#ecf0f1')
+        subtitle_label = tk.Label(main_frame, text="弃赛后HP将直接扣为0，移至淘汰区",
+                                 font=('Microsoft YaHei', 10),
+                                 bg='#ecf0f1', fg='#7f8c8d')
+        subtitle_label.pack(pady=(0, 15))
+        
+        select_frame = tk.LabelFrame(main_frame, text="选择弃赛选手",
+                                    font=('Microsoft YaHei', 11, 'bold'),
+                                    bg='#ecf0f1', padx=15, pady=15)
         select_frame.pack(fill='x', pady=10)
-        
-        tk.Label(select_frame, text="选择弃赛选手：",
-                font=('Microsoft YaHei', 12, 'bold'),
-                bg='#ecf0f1').pack(anchor='w')
         
         display_names = [f"{name}（{pos}）" for name, pos in quit_candidates]
         selected_var = tk.StringVar()
@@ -1909,45 +1912,50 @@ class CrazySaturdayApp:
                 error_label.config(text="弃赛操作失败，请重试！")
         
         btn_frame = tk.Frame(main_frame, bg='#ecf0f1')
-        btn_frame.pack(pady=20)
+        btn_frame.pack(pady=25)
         
-        tk.Button(btn_frame, text="确认弃赛", command=on_confirm,
+        tk.Button(btn_frame, text="✓ 确认弃赛", command=on_confirm,
                  bg='#e74c3c', fg='white',
                  font=('Microsoft YaHei', 12, 'bold'),
-                 width=10, padx=10, pady=5).pack(side='left', padx=10)
+                 width=12, height=1, padx=15, pady=8,
+                 activebackground='#c0392b').pack(side='left', padx=15)
         
-        tk.Button(btn_frame, text="取消", command=dialog.destroy,
+        tk.Button(btn_frame, text="✗ 取消", command=dialog.destroy,
                  bg='#95a5a6', fg='white',
                  font=('Microsoft YaHei', 12, 'bold'),
-                 width=10, padx=10, pady=5).pack(side='left', padx=10)
+                 width=12, height=1, padx=15, pady=8,
+                 activebackground='#7f8c8d').pack(side='left', padx=15)
     
     def show_join_dialog(self):
         """显示挑战者加入对话框"""
         dialog = tk.Toplevel(self.root)
         dialog.title("➕ 挑战者加入")
-        dialog.geometry("480x400")
+        dialog.geometry("500x480")
         dialog.transient(self.root)
         dialog.grab_set()
         
         dialog.update_idletasks()
-        x = self.root.winfo_x() + (self.root.winfo_width() - 480) // 2
-        y = self.root.winfo_y() + (self.root.winfo_height() - 400) // 2
+        x = (dialog.winfo_screenwidth() - dialog.winfo_width()) // 2
+        y = (dialog.winfo_screenheight() - dialog.winfo_height()) // 2
         dialog.geometry(f"+{x}+{y}")
         
-        main_frame = tk.Frame(dialog, bg='#ecf0f1', padx=20, pady=20)
+        main_frame = tk.Frame(dialog, bg='#ecf0f1', padx=25, pady=25)
         main_frame.pack(fill='both', expand=True)
         
         title_label = tk.Label(main_frame, text="➕ 挑战者加入",
-                              font=('Microsoft YaHei', 16, 'bold'),
-                              bg='#ecf0f1', fg='#2c3e50')
-        title_label.pack(pady=(0, 20))
+                              font=('Microsoft YaHei', 18, 'bold'),
+                              bg='#ecf0f1', fg='#27ae60')
+        title_label.pack(pady=(0, 10))
         
-        name_frame = tk.Frame(main_frame, bg='#ecf0f1')
+        subtitle_label = tk.Label(main_frame, text="新增挑战者将加入场外候补区尾部",
+                                 font=('Microsoft YaHei', 10),
+                                 bg='#ecf0f1', fg='#7f8c8d')
+        subtitle_label.pack(pady=(0, 15))
+        
+        name_frame = tk.LabelFrame(main_frame, text="选手姓名",
+                                  font=('Microsoft YaHei', 11, 'bold'),
+                                  bg='#ecf0f1', padx=15, pady=15)
         name_frame.pack(fill='x', pady=10)
-        
-        tk.Label(name_frame, text="选手姓名：",
-                font=('Microsoft YaHei', 12, 'bold'),
-                bg='#ecf0f1').pack(anchor='w')
         
         name_var = tk.StringVar()
         name_entry = tk.Entry(name_frame, textvariable=name_var,
@@ -1956,8 +1964,8 @@ class CrazySaturdayApp:
         
         hp_frame = tk.LabelFrame(main_frame, text="生命值",
                                  font=('Microsoft YaHei', 11, 'bold'),
-                                 bg='#ecf0f1', padx=10, pady=10)
-        hp_frame.pack(fill='x', pady=15)
+                                 bg='#ecf0f1', padx=15, pady=15)
+        hp_frame.pack(fill='x', pady=10)
         
         hp_var = tk.IntVar(value=3)
         hp_buttons_frame = tk.Frame(hp_frame, bg='#ecf0f1')
@@ -1991,17 +1999,19 @@ class CrazySaturdayApp:
                 error_label.config(text=err_msg)
         
         btn_frame = tk.Frame(main_frame, bg='#ecf0f1')
-        btn_frame.pack(pady=20)
+        btn_frame.pack(pady=25)
         
-        tk.Button(btn_frame, text="确认加入", command=on_confirm,
+        tk.Button(btn_frame, text="✓ 确认加入", command=on_confirm,
                  bg='#27ae60', fg='white',
                  font=('Microsoft YaHei', 12, 'bold'),
-                 width=10, padx=10, pady=5).pack(side='left', padx=10)
+                 width=12, height=1, padx=15, pady=8,
+                 activebackground='#1e8449').pack(side='left', padx=15)
         
-        tk.Button(btn_frame, text="取消", command=dialog.destroy,
+        tk.Button(btn_frame, text="✗ 取消", command=dialog.destroy,
                  bg='#95a5a6', fg='white',
                  font=('Microsoft YaHei', 12, 'bold'),
-                 width=10, padx=10, pady=5).pack(side='left', padx=10)
+                 width=12, height=1, padx=15, pady=8,
+                 activebackground='#7f8c8d').pack(side='left', padx=15)
     
     def update_players_table(self):
         """更新选手表格内容"""
