@@ -252,7 +252,7 @@ class CrazySaturdayApp:
         hp_options_frame = tk.Frame(add_controls_frame, bg='#ecf0f1')
         hp_options_frame.pack(side='left', padx=5)
         
-        for hp_value in [2, 3, 4, 5, 6, 7, 8]:
+        for hp_value in [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]:
             hp_radio = tk.Radiobutton(hp_options_frame, 
                                      text=str(hp_value),
                                      variable=self.lives_var,
@@ -1038,8 +1038,8 @@ class CrazySaturdayApp:
             # 验证HP值
             try:
                 hp_value = int(new_value)
-                if hp_value < 2 or hp_value > 8:
-                    self.show_error("HP值必须在2-8之间！")
+                if hp_value < 2 or hp_value > 12:
+                    self.show_error("HP值必须在2-12之间！")
                     return False
             except ValueError:
                 self.show_error("HP值必须是数字！")
@@ -1170,8 +1170,8 @@ class CrazySaturdayApp:
             # 验证HP值
             try:
                 hp_value = int(new_value)
-                if hp_value < 2 or hp_value > 8:
-                    self.show_error("HP值必须在2-8之间！")
+                if hp_value < 2 or hp_value > 12:
+                    self.show_error("HP值必须在2-12之间！")
                     return False
             except ValueError:
                 self.show_error("HP值必须是数字！")
@@ -1696,14 +1696,29 @@ class CrazySaturdayApp:
             
             # 创建生命值选项
             options_frame = tk.Frame(hp_select_frame, bg='#ecf0f1')
-            options_frame.pack(pady=10)
+            options_frame.pack(pady=5)
             
-            for hp in range(1, player.initial_lives + 1):
-                rb = tk.Radiobutton(options_frame, text=str(hp),
-                                   variable=hp_var, value=hp,
-                                   font=('Microsoft YaHei', 12, 'bold'),
-                                   bg='#ecf0f1', activebackground='#ecf0f1')
-                rb.pack(side='left', padx=10)
+            hp_values = list(range(1, player.initial_lives + 1))
+            if len(hp_values) > 6:
+                row1_frame = tk.Frame(options_frame, bg='#ecf0f1')
+                row1_frame.pack()
+                row2_frame = tk.Frame(options_frame, bg='#ecf0f1')
+                row2_frame.pack()
+                mid = (len(hp_values) + 1) // 2
+                for i, hp in enumerate(hp_values):
+                    parent = row1_frame if i < mid else row2_frame
+                    rb = tk.Radiobutton(parent, text=str(hp),
+                                       variable=hp_var, value=hp,
+                                       font=('Microsoft YaHei', 12, 'bold'),
+                                       bg='#ecf0f1', activebackground='#ecf0f1')
+                    rb.pack(side='left', padx=10)
+            else:
+                for hp in hp_values:
+                    rb = tk.Radiobutton(options_frame, text=str(hp),
+                                       variable=hp_var, value=hp,
+                                       font=('Microsoft YaHei', 12, 'bold'),
+                                       bg='#ecf0f1', activebackground='#ecf0f1')
+                    rb.pack(side='left', padx=10)
         
         # 绑定选手选择事件
         player_combobox.bind('<<ComboboxSelected>>', update_hp_display)
@@ -1930,7 +1945,7 @@ class CrazySaturdayApp:
         """显示挑战者加入对话框"""
         dialog = tk.Toplevel(self.root)
         dialog.title("➕ 挑战者加入")
-        dialog.geometry("500x480")
+        dialog.geometry("500x550")
         dialog.transient(self.root)
         dialog.grab_set()
         
@@ -1971,8 +1986,16 @@ class CrazySaturdayApp:
         hp_buttons_frame = tk.Frame(hp_frame, bg='#ecf0f1')
         hp_buttons_frame.pack()
         
-        for hp_val in range(2, 9):
-            rb = tk.Radiobutton(hp_buttons_frame, text=str(hp_val),
+        row1_frame = tk.Frame(hp_buttons_frame, bg='#ecf0f1')
+        row1_frame.pack()
+        row2_frame = tk.Frame(hp_buttons_frame, bg='#ecf0f1')
+        row2_frame.pack()
+        
+        hp_values = list(range(2, 13))
+        mid = (len(hp_values) + 1) // 2
+        for i, hp_val in enumerate(hp_values):
+            parent = row1_frame if i < mid else row2_frame
+            rb = tk.Radiobutton(parent, text=str(hp_val),
                                variable=hp_var, value=hp_val,
                                font=('Microsoft YaHei', 12, 'bold'),
                                bg='#ecf0f1', activebackground='#ecf0f1')
@@ -2590,7 +2613,7 @@ class CrazySaturdayApp:
         self.fp_hp_var = tk.IntVar(value=2)
         hp_frame = tk.Frame(form_frame, bg='white')
         hp_frame.grid(row=4, column=1, sticky=tk.W, pady=8)
-        for hp in range(2, 9):
+        for hp in range(2, 13):
             tk.Radiobutton(hp_frame, text=str(hp), variable=self.fp_hp_var, value=hp,
                           bg='white', font=('Microsoft YaHei', 10)).pack(side=tk.LEFT, padx=2)
 
